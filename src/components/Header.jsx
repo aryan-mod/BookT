@@ -1,8 +1,8 @@
 import React, { useEffect, useRef } from 'react';
-import { Search, Bell, User, Moon, Sun, BookOpen } from 'lucide-react';
+import { Search, Bell, User, Moon, Sun, BookOpen, Plus } from 'lucide-react';
 import { gsap } from 'gsap';
 
-const Header = ({ theme, toggleTheme, searchQuery, setSearchQuery }) => {
+const Header = ({ theme, toggleTheme, searchQuery, setSearchQuery, onAddBook }) => {
   const headerRef = useRef(null);
   const logoRef = useRef(null);
 
@@ -53,6 +53,14 @@ const Header = ({ theme, toggleTheme, searchQuery, setSearchQuery }) => {
           </div>
 
           <div className="flex items-center space-x-4">
+            <button
+              onClick={onAddBook}
+              className="flex items-center space-x-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-all duration-200 hover:scale-105 font-medium"
+            >
+              <Plus className="h-4 w-4" />
+              <span className="hidden sm:inline">Add Book</span>
+            </button>
+
             <button
               onClick={toggleTheme}
               className="p-2 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-all duration-200 hover:scale-110"

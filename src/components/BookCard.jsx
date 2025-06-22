@@ -1,11 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Star, Clock, BookOpen, Heart, MessageCircle, Share2, MoreHorizontal } from 'lucide-react';
+import { Star, Clock, BookOpen, Heart, MessageCircle, Share2, MoreHorizontal, Edit, Play, Pause } from 'lucide-react';
 import { gsap } from 'gsap';
 
-const BookCard = ({ book, onBookClick, onReactionClick }) => {
+const BookCard = ({ book, onBookClick, onBookEdit, onReactionClick, onProgressUpdate }) => {
   const cardRef = useRef(null);
   const [isHovered, setIsHovered] = useState(false);
-  const [showTooltip, setShowTooltip] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
+  const [currentPage, setCurrentPage] = useState(book.currentPage || 0);
 
   useEffect(() => {
     const card = cardRef.current;
@@ -28,6 +29,7 @@ const BookCard = ({ book, onBookClick, onReactionClick }) => {
 
   const handleMouseLeave = () => {
     setIsHovered(false);
+    setShowMenu(false);
     gsap.to(cardRef.current, {
       y: 0,
       scale: 1,
@@ -53,10 +55,19 @@ const BookCard = ({ book, onBookClick, onReactionClick }) => {
     return 0;
   };
 
+  const handleProgressChange = (e) => {
+    e.stopPropagation();
+    const newPage = parseInt(e.target.value);
+    setCurrentPage(newPage);
+    onProgressUpdate(book.id, newPage);
+  };
+
+  const quickReactions = ['❤️', '👍', '🔥', '📚'];
+
   return (
     <div
       ref={cardRef}
-      className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg dark:shadow-gray-900/20 overflow-hidden cursor-pointer transition-all duration-300 hover:shadow-xl dark:hover:shadow-gray-900/40 group"
+      className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg dark:shadow-gray-900/20 overflow-hidden cursor-pointer transition-all duration-300 hover:shadow-xl dark:hover:shadow-gray-900/40 group relative"
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
       onClick={() => onBookClick(book)}
@@ -72,16 +83,35 @@ const BookCard = ({ book, onBookClick, onReactionClick }) => {
             {book.status}
           </span>
         </div>
+        
         <div className="absolute top-4 right-4">
-          <button 
-            className="p-2 bg-white/90 dark:bg-gray-800/90 rounded-full hover:bg-white dark:hover:bg-gray-800 transition-colors duration-200"
-            onClick={(e) => {
-              e.stopPropagation();
-              setShowTooltip(!showTooltip);
-            }}
-          >
-            <MoreHorizontal className="h-4 w-4 text-gray-600 dark:text-gray-400" />
-          </button>
+          <div className="relative">
+            <button 
+              className="p-2 bg-white/90 dark:bg-gray-800/90 rounded-full hover:bg-white dark:hover:bg-gray-800 transition-colors duration-200"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowMenu(!showMenu);
+              }}
+            >
+              <MoreHorizontal className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+            </button>
+            
+            {showMenu && (
+              <div className="absolute right-0 top-12 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-2 z-10 min-w-[120px]">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onBookEdit(book);
+                    setShowMenu(false);
+                  }}
+                  className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center space-x-2"
+                >
+                  <Edit className="h-4 w-4" />
+                  <span>Edit</span>
+                </button>
+              </div>
+            )}
+          </div>
         </div>
         
         {book.status === 'reading' && (
@@ -93,6 +123,24 @@ const BookCard = ({ book, onBookClick, onReactionClick }) => {
               ></div>
             </div>
             <p className="text-white text-sm font-medium">{getProgress()}% complete</p>
+          </div>
+        )}
+
+        {/* Quick reaction overlay */}
+        {isHovered && (
+          <div className="absolute bottom-4 right-4 flex space-x-1">
+            {quickReactions.map((emoji) => (
+              <button
+                key={emoji}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onReactionClick(book.id, emoji);
+                }}
+                className="w-8 h-8 bg-white/90 dark:bg-gray-800/90 rounded-full flex items-center justify-center hover:scale-110 transition-transform duration-200"
+              >
+                <span className="text-sm">{emoji}</span>
+              </button>
+            ))}
           </div>
         )}
       </div>
@@ -141,10 +189,33 @@ const BookCard = ({ book, onBookClick, onReactionClick }) => {
           </div>
         </div>
 
+        {/* Reading Progress for Currently Reading Books */}
+        {book.status === 'reading' && (
+          <div className="mb-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                Reading Progress
+              </span>
+              <span className="text-sm text-gray-600 dark:text-gray-400">
+                {currentPage} / {book.pages}
+              </span>
+            </div>
+            <input
+              type="range"
+              min="0"
+              max={book.pages}
+              value={currentPage}
+              onChange={handleProgressChange}
+              className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer slider"
+              onClick={(e) => e.stopPropagation()}
+            />
+          </div>
+        )}
+
         {book.reactions && Object.keys(book.reactions).length > 0 && (
           <div className="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-gray-700">
             <div className="flex items-center space-x-3">
-              {Object.entries(book.reactions).map(([emoji, count]) => (
+              {Object.entries(book.reactions).slice(0, 3).map(([emoji, count]) => (
                 <button
                   key={emoji}
                   onClick={(e) => {
@@ -159,13 +230,22 @@ const BookCard = ({ book, onBookClick, onReactionClick }) => {
               ))}
             </div>
             <div className="flex items-center space-x-2">
-              <button className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors duration-200">
+              <button 
+                onClick={(e) => e.stopPropagation()}
+                className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors duration-200"
+              >
                 <Heart className="h-4 w-4 text-gray-500 dark:text-gray-400" />
               </button>
-              <button className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors duration-200">
+              <button 
+                onClick={(e) => e.stopPropagation()}
+                className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors duration-200"
+              >
                 <MessageCircle className="h-4 w-4 text-gray-500 dark:text-gray-400" />
               </button>
-              <button className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors duration-200">
+              <button 
+                onClick={(e) => e.stopPropagation()}
+                className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors duration-200"
+              >
                 <Share2 className="h-4 w-4 text-gray-500 dark:text-gray-400" />
               </button>
             </div>

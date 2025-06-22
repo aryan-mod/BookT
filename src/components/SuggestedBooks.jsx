@@ -1,8 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { TrendingUp, Sparkles, X } from 'lucide-react';
+import { TrendingUp, Sparkles, X, Plus } from 'lucide-react';
 import { gsap } from 'gsap';
 
-const SuggestedBooks = ({ suggestions, isVisible, onClose }) => {
+const SuggestedBooks = ({ suggestions, isVisible, onClose, onAddBook }) => {
   const tooltipRef = useRef(null);
   const [currentIndex, setCurrentIndex] = useState(0);
 
@@ -19,10 +19,38 @@ const SuggestedBooks = ({ suggestions, isVisible, onClose }) => {
     if (isVisible) {
       const interval = setInterval(() => {
         setCurrentIndex((prev) => (prev + 1) % suggestions.length);
-      }, 3000);
+      }, 4000);
       return () => clearInterval(interval);
     }
   }, [isVisible, suggestions.length]);
+
+  const handleAddSuggestion = () => {
+    const suggestion = suggestions[currentIndex];
+    const newBook = {
+      id: Date.now(),
+      title: suggestion.title,
+      author: suggestion.author,
+      cover: `https://images.pexels.com/photos/${Math.floor(Math.random() * 1000000)}/pexels-photo-${Math.floor(Math.random() * 1000000)}.jpeg?auto=compress&cs=tinysrgb&w=400`,
+      pages: Math.floor(Math.random() * 400) + 200,
+      genre: ['Fiction'], // Default genre
+      status: 'wishlist',
+      rating: 0,
+      reactions: {},
+      highlights: [],
+      review: ''
+    };
+    
+    onAddBook(newBook);
+    
+    // Show success animation
+    gsap.to(tooltipRef.current, {
+      scale: 1.1,
+      duration: 0.2,
+      yoyo: true,
+      repeat: 1,
+      ease: "power2.out"
+    });
+  };
 
   if (!isVisible) return null;
 
@@ -65,18 +93,23 @@ const SuggestedBooks = ({ suggestions, isVisible, onClose }) => {
         <div className="flex items-center justify-between">
           <div className="flex space-x-1">
             {suggestions.map((_, index) => (
-              <div
+              <button
                 key={index}
+                onClick={() => setCurrentIndex(index)}
                 className={`w-2 h-2 rounded-full transition-all duration-300 ${
                   index === currentIndex 
                     ? 'bg-purple-500' 
-                    : 'bg-gray-300 dark:bg-gray-600'
+                    : 'bg-gray-300 dark:bg-gray-600 hover:bg-purple-300'
                 }`}
               />
             ))}
           </div>
-          <button className="px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white text-sm font-medium rounded-lg transition-colors duration-200">
-            Add to List
+          <button 
+            onClick={handleAddSuggestion}
+            className="flex items-center space-x-2 px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white text-sm font-medium rounded-lg transition-colors duration-200"
+          >
+            <Plus className="h-4 w-4" />
+            <span>Add to List</span>
           </button>
         </div>
       </div>
