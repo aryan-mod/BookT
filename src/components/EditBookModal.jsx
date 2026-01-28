@@ -123,19 +123,29 @@ const EditBookModal = ({ book, isOpen, onClose, onUpdateBook, onDeleteBook }) =>
     }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    onUpdateBook({
-      ...formData,
-      pages: parseInt(formData.pages) || 0,
-      currentPage: parseInt(formData.currentPage) || 0
-    });
-    handleClose();
+    try {
+      await onUpdateBook({
+        ...formData,
+        pages: parseInt(formData.pages) || 0,
+        currentPage: parseInt(formData.currentPage) || 0
+      });
+      handleClose();
+    } catch (err) {
+      console.error('Failed to update book:', err);
+      // Keep modal open on error so user can retry
+    }
   };
 
-  const handleDelete = () => {
-    onDeleteBook(book.id);
-    handleClose();
+  const handleDelete = async () => {
+    try {
+      await onDeleteBook(book.id || book._id);
+      handleClose();
+    } catch (err) {
+      console.error('Failed to delete book:', err);
+      // Keep modal open on error so user can retry
+    }
   };
 
   if (!isOpen || !book) return null;

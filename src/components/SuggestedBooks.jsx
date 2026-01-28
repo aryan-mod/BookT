@@ -24,10 +24,9 @@ const SuggestedBooks = ({ suggestions, isVisible, onClose, onAddBook }) => {
     }
   }, [isVisible, suggestions.length]);
 
-  const handleAddSuggestion = () => {
+  const handleAddSuggestion = async () => {
     const suggestion = suggestions[currentIndex];
     const newBook = {
-      id: Date.now(),
       title: suggestion.title,
       author: suggestion.author,
       cover: `https://images.pexels.com/photos/${Math.floor(Math.random() * 1000000)}/pexels-photo-${Math.floor(Math.random() * 1000000)}.jpeg?auto=compress&cs=tinysrgb&w=400`,
@@ -40,16 +39,20 @@ const SuggestedBooks = ({ suggestions, isVisible, onClose, onAddBook }) => {
       review: ''
     };
     
-    onAddBook(newBook);
-    
-    // Show success animation
-    gsap.to(tooltipRef.current, {
-      scale: 1.1,
-      duration: 0.2,
-      yoyo: true,
-      repeat: 1,
-      ease: "power2.out"
-    });
+    try {
+      await onAddBook(newBook);
+      
+      // Show success animation
+      gsap.to(tooltipRef.current, {
+        scale: 1.1,
+        duration: 0.2,
+        yoyo: true,
+        repeat: 1,
+        ease: "power2.out"
+      });
+    } catch (err) {
+      console.error('Failed to add suggested book:', err);
+    }
   };
 
   if (!isVisible) return null;

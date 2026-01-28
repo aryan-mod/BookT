@@ -110,11 +110,10 @@ const AddBookModal = ({ isOpen, onClose, onAddBook }) => {
     }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (formData.title && formData.author) {
       const newBook = {
-        id: Date.now(),
         ...formData,
         pages: parseInt(formData.pages) || 0,
         currentPage: parseInt(formData.currentPage) || 0,
@@ -123,8 +122,13 @@ const AddBookModal = ({ isOpen, onClose, onAddBook }) => {
         highlights: [],
         review: ''
       };
-      onAddBook(newBook);
-      handleClose();
+      try {
+        await onAddBook(newBook);
+        handleClose();
+      } catch (err) {
+        console.error('Failed to add book:', err);
+        // Keep modal open on error so user can retry
+      }
     }
   };
 

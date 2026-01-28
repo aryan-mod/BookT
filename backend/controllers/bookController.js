@@ -2,7 +2,7 @@ const Book = require('../models/Book');
 
 const getBooks = async (req, res) => {
   try {
-    const books = await Book.find({ user: req.user._id }).sort({ createdAt: -1 });
+    const books = await Book.find().sort({ createdAt: -1 });
     res.json(books);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -15,10 +15,6 @@ const getBookById = async (req, res) => {
 
     if (!book) {
       return res.status(404).json({ message: 'Book not found' });
-    }
-
-    if (book.user.toString() !== req.user._id.toString()) {
-      return res.status(401).json({ message: 'Not authorized to view this book' });
     }
 
     res.json(book);
@@ -50,7 +46,6 @@ const createBook = async (req, res) => {
     }
 
     const book = await Book.create({
-      user: req.user._id,
       title,
       author,
       cover: cover || '',
@@ -80,10 +75,6 @@ const updateBook = async (req, res) => {
       return res.status(404).json({ message: 'Book not found' });
     }
 
-    if (book.user.toString() !== req.user._id.toString()) {
-      return res.status(401).json({ message: 'Not authorized to update this book' });
-    }
-
     const updatedBook = await Book.findByIdAndUpdate(
       req.params.id,
       req.body,
@@ -102,10 +93,6 @@ const deleteBook = async (req, res) => {
 
     if (!book) {
       return res.status(404).json({ message: 'Book not found' });
-    }
-
-    if (book.user.toString() !== req.user._id.toString()) {
-      return res.status(401).json({ message: 'Not authorized to delete this book' });
     }
 
     await Book.findByIdAndDelete(req.params.id);

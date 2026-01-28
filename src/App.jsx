@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { gsap } from 'gsap';
 import { useTheme } from './hooks/useTheme';
 import { useLocalStorage } from './hooks/useLocalStorage';
-import { mockBooks, mockStreakData, suggestedBooks } from './data/mockData';
+import { useBooks } from './hooks/useBooks';
+import { mockStreakData, suggestedBooks } from './data/mockData';
 
 import Header from './components/Header';
 import StreakTracker from './components/StreakTracker';
@@ -16,7 +17,7 @@ import SuggestedBooks from './components/SuggestedBooks';
 
 function App() {
   const { theme, toggleTheme } = useTheme();
-  const [books, setBooks] = useLocalStorage('books', mockBooks);
+  const { books, loading: booksLoading, error: booksError, addBook, updateBook, deleteBook } = useBooks();
   const [streakData, setStreakData] = useLocalStorage('streakData', mockStreakData);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedBook, setSelectedBook] = useState(null);
@@ -51,7 +52,10 @@ function App() {
           return (b.pages || 0) - (a.pages || 0);
         case 'recent':
         default:
-          return new Date(b.startDate || b.id) - new Date(a.startDate || a.id);
+          // Sort by createdAt if available (from MongoDB), otherwise by startDate or id
+          const dateA = b.createdAt ? new Date(b.createdAt) : (b.startDate ? new Date(b.startDate) : new Date(b.id || b._id));
+          const dateB = a.createdAt ? new Date(a.createdAt) : (a.startDate ? new Date(a.startDate) : new Date(a.id || a._id));
+          return dateB - dateA;
       }
     });
 
@@ -68,60 +72,71 @@ function App() {
   };
 
   // Handle reaction click
-  const handleReactionClick = (bookId, emoji) => {
-    setBooks(prevBooks =>
-      prevBooks.map(book => {
-        if (book.id === bookId) {
-          const newReactions = { ...book.reactions };
-          newReactions[emoji] = (newReactions[emoji] || 0) + 1;
-          return { ...book, reactions: newReactions };
-        }
-        return book;
-      })
-    );
+  const handleReactionClick = async (bookId, emoji) => {
+    const book = books.find(b => b.id === bookId || b._id === bookId);
+    if (!book) return;
+    
+    const newReactions = { ...book.reactions };
+    newReactions[emoji] = (newReactions[emoji] || 0) + 1;
+    
+    try {
+      await updateBook(bookId, { ...book, reactions: newReactions });
+    } catch (err) {
+      console.error('Failed to update reaction:', err);
+    }
   };
 
   // Add new book
-  const handleAddBook = (newBook) => {
-    setBooks(prevBooks => [newBook, ...prevBooks]);
-    
-    // Update streak if book is started today
-    if (newBook.status === 'reading' && newBook.startDate === new Date().toISOString().split('T')[0]) {
-      updateStreakForToday();
+  const handleAddBook = async (newBook) => {
+    try {
+      await addBook(newBook);
+      
+      // Update streak if book is started today
+      if (newBook.status === 'reading' && newBook.startDate === new Date().toISOString().split('T')[0]) {
+        updateStreakForToday();
+      }
+    } catch (err) {
+      console.error('Failed to add book:', err);
     }
   };
 
   // Update book
-  const handleUpdateBook = (updatedBook) => {
-    setBooks(prevBooks =>
-      prevBooks.map(book => book.id === updatedBook.id ? updatedBook : book)
-    );
-    
-    // Update streak if book was completed today
-    if (updatedBook.status === 'completed' && updatedBook.endDate === new Date().toISOString().split('T')[0]) {
-      updateStreakForToday();
+  const handleUpdateBook = async (updatedBook) => {
+    try {
+      const bookId = updatedBook.id || updatedBook._id;
+      await updateBook(bookId, updatedBook);
+      
+      // Update streak if book was completed today
+      if (updatedBook.status === 'completed' && updatedBook.endDate === new Date().toISOString().split('T')[0]) {
+        updateStreakForToday();
+      }
+    } catch (err) {
+      console.error('Failed to update book:', err);
     }
   };
 
   // Delete book
-  const handleDeleteBook = (bookId) => {
-    setBooks(prevBooks => prevBooks.filter(book => book.id !== bookId));
+  const handleDeleteBook = async (bookId) => {
+    try {
+      await deleteBook(bookId);
+    } catch (err) {
+      console.error('Failed to delete book:', err);
+    }
   };
 
   // Update reading progress
-  const handleProgressUpdate = (bookId, currentPage) => {
-    setBooks(prevBooks =>
-      prevBooks.map(book => {
-        if (book.id === bookId) {
-          const progress = Math.round((currentPage / book.pages) * 100);
-          return { ...book, currentPage, progress };
-        }
-        return book;
-      })
-    );
+  const handleProgressUpdate = async (bookId, currentPage) => {
+    const book = books.find(b => b.id === bookId || b._id === bookId);
+    if (!book) return;
     
-    // Update streak for reading activity
-    updateStreakForToday();
+    try {
+      await updateBook(bookId, { ...book, currentPage });
+      
+      // Update streak for reading activity
+      updateStreakForToday();
+    } catch (err) {
+      console.error('Failed to update progress:', err);
+    }
   };
 
   // Update streak data
@@ -178,26 +193,48 @@ function App() {
       />
       
       <main className="main-content max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Loading State */}
+        {booksLoading && (
+          <div className="text-center py-12">
+            <div className="text-gray-400 dark:text-gray-500 mb-4">
+              <svg className="animate-spin mx-auto h-12 w-12" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+            </div>
+            <p className="text-gray-600 dark:text-gray-400">Loading books...</p>
+          </div>
+        )}
+
+        {/* Error State */}
+        {booksError && !booksLoading && (
+          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 mb-8">
+            <p className="text-red-800 dark:text-red-200">Error loading books: {booksError}</p>
+          </div>
+        )}
+
         {/* Stats Panel */}
-        <StatsPanel books={books} />
+        {!booksLoading && <StatsPanel books={books} />}
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
-          {/* Streak Tracker */}
-          <div className="lg:col-span-1">
-            <StreakTracker 
-              streakData={streakData} 
-              onUpdateStreak={updateStreakForToday}
-            />
-          </div>
-          
-          {/* Word Cloud */}
-          <div className="lg:col-span-2">
-            <WordCloud books={books} />
-          </div>
-        </div>
+        {!booksLoading && (
+          <>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+              {/* Streak Tracker */}
+              <div className="lg:col-span-1">
+                <StreakTracker 
+                  streakData={streakData} 
+                  onUpdateStreak={updateStreakForToday}
+                />
+              </div>
+              
+              {/* Word Cloud */}
+              <div className="lg:col-span-2">
+                <WordCloud books={books} />
+              </div>
+            </div>
 
-        {/* Books Section */}
-        <div className="mb-8">
+            {/* Books Section */}
+            <div className="mb-8">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
               {searchQuery ? `Search Results (${filteredAndSortedBooks.length})` : 'Your Library'}
@@ -273,6 +310,8 @@ function App() {
             </div>
           )}
         </div>
+          </>
+        )}
       </main>
 
       {/* Book Detail Modal */}
