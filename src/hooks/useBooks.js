@@ -1,138 +1,103 @@
 import { useState, useEffect } from 'react';
+import api from '../api/axios';
 
-const API_BASE_URL = "https://bookt-g6ix.onrender.com/api";
+/**
+ * Normalize book from API: ensure `id` for frontend compatibility.
+ * Progress fields (currentPage, status, rating, startDate, endDate) come from
+ * the merged response when authenticated; may be absent when not.
+ */
+function normalizeBook(book) {
+  if (!book) return null;
+  return {
+    ...book,
+    id: book.id || book._id,
+  };
+}
+
+function getErrorMessage(err) {
+  const msg = err.response?.data?.message;
+  if (Array.isArray(msg)) return msg.join(', ');
+  if (typeof msg === 'string') return msg;
+  return err.message || 'Request failed';
+}
 
 export const useBooks = () => {
   const [books, setBooks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Fetch books from backend
   const fetchBooks = async () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await fetch(`${API_BASE_URL}/books`);
-      
-      if (!response.ok) {
-        throw new Error(`Failed to fetch books: ${response.statusText}`);
-      }
-      
-      const data = await response.json();
-      // Map MongoDB _id to id for frontend compatibility
-      const booksWithId = Array.isArray(data) ? data.map(book => ({
-        ...book,
-        id: book._id || book.id
-      })) : [];
-      setBooks(booksWithId);
+      const response = await api.get('/books');
+      const raw = response.data?.data?.books;
+      const list = Array.isArray(raw) ? raw : [];
+      setBooks(list.map(normalizeBook));
     } catch (err) {
       console.error('Error fetching books:', err);
-      setError(err.message);
-      setBooks([]); // Set empty array on error
+      setError(getErrorMessage(err));
+      setBooks([]);
     } finally {
       setLoading(false);
     }
   };
 
-  // Add a new book
   const addBook = async (bookData) => {
     try {
       setError(null);
-      const response = await fetch(`${API_BASE_URL}/books`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(bookData),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to add book: ${response.statusText}`);
+      const response = await api.post('/books', bookData);
+      const raw = response.data?.data?.book;
+      const bookWithId = normalizeBook(raw);
+      if (bookWithId) {
+        setBooks(prev => [bookWithId, ...prev]);
       }
-
-      const newBook = await response.json();
-      // Map _id to id
-      const bookWithId = {
-        ...newBook,
-        id: newBook._id || newBook.id
-      };
-      setBooks(prevBooks => [bookWithId, ...prevBooks]);
       return bookWithId;
     } catch (err) {
       console.error('Error adding book:', err);
-      setError(err.message);
+      const msg = getErrorMessage(err);
+      setError(msg);
       throw err;
     }
   };
 
-  // Update an existing book
   const updateBook = async (bookId, bookData) => {
     try {
       setError(null);
-      // Use _id if available, otherwise use id
-      const mongoId = typeof bookId === 'object' ? (bookId._id || bookId.id) : bookId;
-      const response = await fetch(`${API_BASE_URL}/books/${mongoId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(bookData),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to update book: ${response.statusText}`);
+      const mongoId = typeof bookId === 'object' ? (bookId._id ?? bookId.id) : bookId;
+      const response = await api.put(`/books/${mongoId}`, bookData);
+      const raw = response.data?.data?.book;
+      const bookWithId = normalizeBook(raw);
+      if (bookWithId) {
+        const targetId = bookId?.id ?? bookId?._id ?? bookId;
+        setBooks(prev =>
+          prev.map(b => (b.id === targetId || b._id === targetId ? bookWithId : b))
+        );
       }
-
-      const updatedBook = await response.json();
-      // Map _id to id
-      const bookWithId = {
-        ...updatedBook,
-        id: updatedBook._id || updatedBook.id
-      };
-      setBooks(prevBooks =>
-        prevBooks.map(book => {
-          const currentId = book.id || book._id;
-          const targetId = bookId.id || bookId._id || bookId;
-          return currentId === targetId ? bookWithId : book;
-        })
-      );
       return bookWithId;
     } catch (err) {
       console.error('Error updating book:', err);
-      setError(err.message);
+      const msg = getErrorMessage(err);
+      setError(msg);
       throw err;
     }
   };
 
-  // Delete a book
   const deleteBook = async (bookId) => {
     try {
       setError(null);
-      // Use _id if available, otherwise use id
-      const mongoId = typeof bookId === 'object' ? (bookId._id || bookId.id) : bookId;
-      const response = await fetch(`${API_BASE_URL}/books/${mongoId}`, {
-        method: 'DELETE',
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to delete book: ${response.statusText}`);
-      }
-
-      const targetId = typeof bookId === 'object' ? (bookId._id || bookId.id) : bookId;
-      setBooks(prevBooks =>
-        prevBooks.filter(book => {
-          const currentId = book.id || book._id;
-          return currentId !== targetId;
-        })
-      );
+      const mongoId = typeof bookId === 'object' ? (bookId._id ?? bookId.id) : bookId;
+      await api.delete(`/books/${mongoId}`);
+      const targetId = typeof bookId === 'object' ? (bookId._id ?? bookId.id) : bookId;
+      setBooks(prev => prev.filter(b => b.id !== targetId && b._id !== targetId));
     } catch (err) {
       console.error('Error deleting book:', err);
-      setError(err.message);
+      const msg = getErrorMessage(err);
+      setError(msg);
       throw err;
     }
   };
 
-  // Fetch books on mount
   useEffect(() => {
     fetchBooks();
   }, []);

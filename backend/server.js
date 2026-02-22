@@ -1,30 +1,16 @@
-const express = require('express');
-const cors = require('cors');
-const dotenv = require('dotenv');
-const connectDB = require('./config/db');
-const errorHandler = require('./middleware/errorHandler');
-
-dotenv.config();
-
-const app = express();
+require('dotenv').config();
+const app = require('./src/app');
+const connectDB = require('./src/config/db');
 
 connectDB();
 
-app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-
-app.get('/', (req, res) => {
-  res.json({ message: 'Book Tracker API is running' });
-});
-
-app.use('/api/auth', require('./routes/authRoutes'));
-app.use('/api/books', require('./routes/bookRoutes'));
-
-app.use(errorHandler);
-
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+const server = app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT} in ${process.env.NODE_ENV || 'development'} mode`);
+});
+
+process.on('unhandledRejection', (err) => {
+  console.error('UNHANDLED REJECTION! Shutting down...', err);
+  server.close(() => process.exit(1));
 });

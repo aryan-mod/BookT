@@ -1,10 +1,17 @@
 import React, { useEffect, useRef } from 'react';
-import { Search, Bell, User, Moon, Sun, BookOpen, Plus } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Search, Bell, User, Moon, Sun, BookOpen, Plus, LogOut } from 'lucide-react';
 import { gsap } from 'gsap';
 
-const Header = ({ theme, toggleTheme, searchQuery, setSearchQuery, onAddBook }) => {
+const Header = ({ theme, toggleTheme, searchQuery, setSearchQuery, onAddBook, user, onLogout }) => {
   const headerRef = useRef(null);
   const logoRef = useRef(null);
+
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'development' && user) {
+      console.log('Header user role:', user?.role);
+    }
+  }, [user?.role]);
 
   useEffect(() => {
     const header = headerRef.current;
@@ -28,13 +35,27 @@ const Header = ({ theme, toggleTheme, searchQuery, setSearchQuery, onAddBook }) 
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
-          <div className="flex items-center space-x-4">
-            <div ref={logoRef} className="flex items-center space-x-2 cursor-pointer group">
+          <div className="flex items-center space-x-6">
+            <Link to="/dashboard" ref={logoRef} className="flex items-center space-x-2 cursor-pointer group">
               <BookOpen className="h-8 w-8 text-blue-600 dark:text-blue-400 group-hover:scale-110 transition-transform duration-200" />
               <span className="text-xl font-bold text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors duration-200">
                 BookTracker
               </span>
-            </div>
+            </Link>
+            <Link
+              to="/explore"
+              className="text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors duration-200"
+            >
+              Explore
+            </Link>
+            {String(user?.role).toLowerCase() === 'admin' && (
+              <Link
+                to="/admin"
+                className="text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors duration-200"
+              >
+                Admin
+              </Link>
+            )}
           </div>
 
           <div className="flex-1 max-w-lg mx-8">
@@ -73,9 +94,19 @@ const Header = ({ theme, toggleTheme, searchQuery, setSearchQuery, onAddBook }) 
               <span className="absolute -top-1 -right-1 h-3 w-3 bg-red-500 rounded-full animate-pulse"></span>
             </button>
             
-            <button className="p-2 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-all duration-200 hover:scale-110">
-              <User className="h-5 w-5" />
-            </button>
+            {user ? (
+              <button
+                onClick={onLogout}
+                className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-all duration-200"
+              >
+                <span className="hidden sm:inline text-sm font-medium">{user.name}</span>
+                <LogOut className="h-5 w-5" />
+              </button>
+            ) : (
+              <button className="p-2 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-all duration-200 hover:scale-110">
+                <User className="h-5 w-5" />
+              </button>
+            )}
           </div>
         </div>
       </div>
