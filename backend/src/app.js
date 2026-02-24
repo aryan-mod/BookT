@@ -11,14 +11,22 @@ const {
 
 const app = express();
 
-app.use(helmet({
-  crossOriginResourcePolicy: { policy: 'cross-origin' },
-}));
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+  })
+);
 
-// Credential-based auth: exact origins only (no wildcard when credentials: true)
-const frontendUrl = process.env.FRONTEND_URL || process.env.CORS_ORIGIN?.split(',')[0]?.trim();
+// Credential-based auth: strict, explicit origin allow-list.
+// - Production: Vercel frontend + any extra origins from CORS_ORIGIN
+// - Development: localhost ports for Vite/CRA
+const frontendUrl =
+  process.env.FRONTEND_URL ||
+  process.env.CORS_ORIGIN?.split(',')[0]?.trim();
 const corsOrigins = process.env.CORS_ORIGIN
-  ? process.env.CORS_ORIGIN.split(',').map((o) => o.trim()).filter(Boolean)
+  ? process.env.CORS_ORIGIN.split(',')
+      .map((o) => o.trim())
+      .filter(Boolean)
   : [];
 const defaultDevOrigins = [
   'http://localhost:5173',
@@ -27,17 +35,24 @@ const defaultDevOrigins = [
   'http://localhost:5176',
   'http://localhost:3000',
 ];
-const envOrigins = frontendUrl
-  ? [frontendUrl, ...corsOrigins]
-  : corsOrigins;
+const envOrigins = frontendUrl ? [frontendUrl, ...corsOrigins] : corsOrigins;
 const allowedOrigins = [...new Set([...envOrigins, ...defaultDevOrigins])];
+
+// Expose allowed origins for debugging (/health) without leaking secrets.
+app.locals.corsAllowedOrigins = allowedOrigins;
 
 app.use(
   cors({
     origin: (origin, callback) => {
+      // Allow non-browser clients (e.g., Postman) that send no Origin header.
       if (!origin) return callback(null, true);
-      if (allowedOrigins.includes(origin)) return callback(null, true);
-      callback(null, false);
+
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      // Explicitly reject unknown origins. No CORS headers will be sent.
+      return callback(null, false);
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],

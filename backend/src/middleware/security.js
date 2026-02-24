@@ -8,7 +8,6 @@ const isProduction = process.env.NODE_ENV === 'production';
 /**
  * Login rate limiter: strict in production, relaxed in development.
  * Applied only to POST /auth/login to prevent brute force attacks.
- * GET /auth/me, POST /auth/refresh, POST /auth/logout are NOT limited.
  */
 const loginLimiter = rateLimit({
   windowMs: RATE_LIMIT_WINDOW_MS,
@@ -40,6 +39,21 @@ const registerLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+/**
+ * Generic auth limiter for non-login flows (refresh, logout, etc.).
+ * Much higher ceiling, but still prevents abuse.
+ */
+const authLimiter = rateLimit({
+  windowMs: RATE_LIMIT_WINDOW_MS,
+  max: isProduction ? 100 : 1000,
+  message: {
+    status: 'error',
+    message: 'Too many auth requests. Please try again later.',
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 const sanitizeData = () => mongoSanitize();
 
 const sanitizeXss = () => xss();
@@ -47,6 +61,8 @@ const sanitizeXss = () => xss();
 module.exports = {
   loginLimiter,
   registerLimiter,
+  authLimiter,
   sanitizeData,
   sanitizeXss,
 };
+
