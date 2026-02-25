@@ -50,7 +50,11 @@ export function AuthProvider({ children }) {
   // Debug: ensure role is present (remove after verifying Admin panel works)
   useEffect(() => {
     if (process.env.NODE_ENV === 'development' && user) {
-      console.log('AuthContext user:', { id: user._id, name: user.name, role: user.role });
+      console.log('AuthContext user:', {
+        id: user._id,
+        name: user.name,
+        role: user.role,
+      });
     }
   }, [user]);
 
@@ -68,7 +72,30 @@ export function AuthProvider({ children }) {
       setUser(u);
     } catch (err) {
       const status = err.response?.status;
-      const message = err.response?.data?.message || 'Login failed. Please try again.';
+      const message =
+        err.response?.data?.message || 'Login failed. Please try again.';
+      if (status === 403 && message?.toLowerCase().includes('banned')) {
+        setError('🚫 Your account has been banned. Please contact support.');
+      } else {
+        setError(message);
+      }
+      throw err;
+    }
+  };
+
+  const loginWithGoogle = async (credential) => {
+    setError(null);
+    try {
+      const { data } = await api.post('/auth/google', { credential });
+      const token = data.data?.accessToken || data.accessToken;
+      const u = data.data?.user || data.user;
+      setAccessToken(token);
+      setUser(u);
+    } catch (err) {
+      const status = err.response?.status;
+      const message =
+        err.response?.data?.message ||
+        'Google login failed. Please try again.';
       if (status === 403 && message?.toLowerCase().includes('banned')) {
         setError('🚫 Your account has been banned. Please contact support.');
       } else {
@@ -81,13 +108,19 @@ export function AuthProvider({ children }) {
   const register = async (name, email, password) => {
     setError(null);
     try {
-      const { data } = await api.post('/auth/register', { name, email, password });
+      const { data } = await api.post('/auth/register', {
+        name,
+        email,
+        password,
+      });
       const token = data.data?.accessToken || data.accessToken;
       const u = data.data?.user || data.user;
       setAccessToken(token);
       setUser(u);
     } catch (err) {
-      const message = err.response?.data?.message || 'Registration failed. Please try again.';
+      const message =
+        err.response?.data?.message ||
+        'Registration failed. Please try again.';
       setError(message);
       throw err;
     }
@@ -107,6 +140,7 @@ export function AuthProvider({ children }) {
     error,
     setError,
     login,
+    loginWithGoogle,
     register,
     logout,
   };

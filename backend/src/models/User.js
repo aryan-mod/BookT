@@ -21,6 +21,11 @@ const userSchema = new mongoose.Schema(
       minlength: 6,
       select: false,
     },
+    provider: {
+      type: String,
+      enum: ['local', 'google'],
+      default: 'local',
+    },
     role: {
       type: String,
       enum: ['user', 'admin'],

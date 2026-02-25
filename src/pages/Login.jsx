@@ -1,13 +1,13 @@
-import { useState } from 'react';
+import { useState, useContext } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { useContext } from 'react';
+import { GoogleLogin } from '@react-oauth/google';
 import { AuthContext } from '../context/AuthContext';
 import { BookOpen } from 'lucide-react';
 
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const { login, error, setError } = useContext(AuthContext);
+  const { login, loginWithGoogle, error, setError } = useContext(AuthContext);
   const navigate = useNavigate();
   const location = useLocation();
   const [submitting, setSubmitting] = useState(false);
@@ -25,6 +25,34 @@ export default function Login() {
     } catch (err) {
       const status = err.response?.status;
       const message = err.response?.data?.message || 'Login failed. Please try again.';
+      if (status === 403 && message?.toLowerCase().includes('banned')) {
+        setError('🚫 Your account has been banned. Please contact support.');
+      } else {
+        setError(message);
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleGoogleSuccess = async (credentialResponse) => {
+    const credential = credentialResponse?.credential;
+    if (!credential) {
+      setError('Google login failed. Please try again.');
+      return;
+    }
+
+    setSubmitting(true);
+    setError(null);
+
+    try {
+      await loginWithGoogle(credential);
+      navigate(from, { replace: true });
+    } catch (err) {
+      const status = err.response?.status;
+      const message =
+        err.response?.data?.message ||
+        'Google login failed. Please try again.';
       if (status === 403 && message?.toLowerCase().includes('banned')) {
         setError('🚫 Your account has been banned. Please contact support.');
       } else {
@@ -89,6 +117,28 @@ export default function Login() {
               {submitting ? 'Signing in...' : 'Sign in'}
             </button>
           </form>
+
+          <div className="mt-6">
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-gray-200 dark:border-gray-700" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="px-2 bg-white dark:bg-gray-800 text-gray-500">
+                  Or continue with
+                </span>
+              </div>
+            </div>
+            <div className="mt-4 flex justify-center">
+              <GoogleLogin
+                onSuccess={handleGoogleSuccess}
+                onError={() =>
+                  setError('Google login failed. Please try again.')
+                }
+                useOneTap={false}
+              />
+            </div>
+          </div>
 
           {error && (
             <div className="mt-4 p-3 rounded-lg bg-red-500/10 border border-red-500 text-red-400 text-sm text-center animate-pulse">

@@ -30,6 +30,10 @@ const loginValidation = [
   body('password').notEmpty().withMessage('Password is required'),
 ];
 
+const googleLoginValidation = [
+  body('credential').notEmpty().withMessage('Google credential is required'),
+];
+
 router.post(
   '/register',
   registerLimiter,
@@ -38,6 +42,13 @@ router.post(
   authController.register
 );
 router.post('/login', loginLimiter, loginValidation, validate, authController.login);
+router.post(
+  '/google',
+  loginLimiter,
+  googleLoginValidation,
+  validate,
+  authController.googleLogin
+);
 router.post('/refresh', authLimiter, authController.refresh);
 router.post('/logout', authLimiter, authController.logout);
 router.get('/me', protect, authController.getMe);

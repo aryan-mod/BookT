@@ -8,6 +8,11 @@ const {
   getRefreshTokenFromCookie,
 } = require('../utils/cookieUtils');
 const { authLogger } = require('../utils/logger');
+const { OAuth2Client } = require('google-auth-library');
+const crypto = require('crypto');
+
+const googleClientId = process.env.GOOGLE_CLIENT_ID;
+const googleClient = googleClientId ? new OAuth2Client(googleClientId) : null;
 
 /**
  * Sends access token in body and refresh token in HttpOnly cookie.
@@ -193,6 +198,78 @@ exports.logout = catchAsync(async (req, res, next) => {
     status: 'success',
     message: 'Logged out successfully.',
   });
+});
+
+exports.googleLogin = catchAsync(async (req, res, next) => {
+  if (!googleClient) {
+    return next(
+      new AppError(
+        'Google login is not configured. Please contact support.',
+        500
+      )
+    );
+  }
+
+  const { credential } = req.body || {};
+
+  if (!credential) {
+    return next(new AppError('Google credential is required.', 400));
+  }
+
+  let ticket;
+  try {
+    ticket = await googleClient.verifyIdToken({
+      idToken: credential,
+      audience: googleClientId,
+    });
+  } catch (err) {
+    authLogger.warn('auth.google.verify-failed', {
+      error: err.message,
+      ip: req.ip,
+      userAgent: req.get('user-agent'),
+    });
+    return next(new AppError('Invalid Google token.', 401));
+  }
+
+  const payload = ticket.getPayload();
+  if (!payload || !payload.email) {
+    return next(
+      new AppError('Unable to retrieve email from Google account.', 400)
+    );
+  }
+
+  const email = payload.email.toLowerCase();
+  const name = payload.name || email.split('@')[0];
+  const picture = payload.picture;
+
+  let user = await User.findOne({ email });
+
+  if (user && user.isBanned) {
+    authLogger.warn('auth.google.banned-user', {
+      userId: user._id,
+      ip: req.ip,
+      userAgent: req.get('user-agent'),
+    });
+    return res.status(403).json({
+      status: 'fail',
+      message: 'Your account has been banned. Please contact support.',
+    });
+  }
+
+  const isNewUser = !user;
+
+  if (!user) {
+    const randomPassword = crypto.randomBytes(32).toString('hex');
+
+    user = await User.create({
+      name,
+      email,
+      password: randomPassword,
+      provider: 'google',
+    });
+  }
+
+  await createSendTokens(user, req, res, isNewUser ? 201 : 200);
 });
 
 /**
