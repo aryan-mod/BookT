@@ -4,7 +4,7 @@
 
 ### Login / Register
 - **Response**: `{ status, message, data: { user, accessToken, expiresIn } }`
-- **Cookie**: `refreshToken` (HttpOnly, Secure in prod, SameSite=strict)
+- **Cookie**: `refreshToken` (HttpOnly, Secure in prod, SameSite=none)
 - Access token is **NOT** in a cookie—store in memory only on frontend.
 
 ### Refresh (`POST /api/v1/auth/refresh`)
