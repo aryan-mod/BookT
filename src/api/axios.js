@@ -61,4 +61,18 @@ api.interceptors.response.use(
   }
 );
 
+export function saveProgressOnUnload(bookId, currentPage, totalPages) {
+  const token = getAccessToken?.();
+  if (!token || !bookId) return;
+  const base = import.meta.env.VITE_API_URL || 'http://localhost:5000/api/v1';
+  const url = `${base}/reader/progress`;
+  fetch(url, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ bookId, currentPage, totalPages }),
+    keepalive: true,
+    credentials: 'include',
+  }).catch(() => {});
+}
+
 export default api;

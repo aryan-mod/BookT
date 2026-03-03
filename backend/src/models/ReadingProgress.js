@@ -15,6 +15,19 @@ const readingProgressSchema = new mongoose.Schema(
       ref: 'Book',
       required: true,
     },
+    externalId: {
+      type: String,
+      default: null,
+      index: true,
+      trim: true,
+    },
+    externalSource: {
+      type: String,
+      enum: ['google', 'open-library'],
+      default: null,
+      index: true,
+      trim: true,
+    },
     currentPage: {
       type: Number,
       default: 0,
@@ -56,6 +69,10 @@ const readingProgressSchema = new mongoose.Schema(
 );
 
 readingProgressSchema.index({ user: 1, book: 1 }, { unique: true });
+readingProgressSchema.index(
+  { user: 1, externalSource: 1, externalId: 1 },
+  { unique: true, sparse: true }
+);
 
 const ReadingProgress = mongoose.model('ReadingProgress', readingProgressSchema);
 module.exports = ReadingProgress;

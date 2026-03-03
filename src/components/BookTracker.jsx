@@ -10,7 +10,7 @@ import { mockStreakData, suggestedBooks } from '../data/mockData';
 import Header from './Header';
 import StreakTracker from './StreakTracker';
 import StatsPanel from './StatsPanel';
-import BookCard from './BookCard';
+import LibraryBookCard from './LibraryBookCard';
 import BookModal from './BookModal';
 import AddBookModal from './AddBookModal';
 import EditBookModal from './EditBookModal';
@@ -26,7 +26,14 @@ export default function BookTracker() {
     logout();
     navigate('/login', { replace: true });
   };
-  const { books, loading: booksLoading, error: booksError, addBook, updateBook, deleteBook } = useBooks();
+  const {
+    books = [],
+    loading: booksLoading,
+    error: booksError,
+    addBook,
+    updateBook,
+    deleteBook,
+  } = useBooks();
   const [streakData, setStreakData] = useLocalStorage('streakData', mockStreakData);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedBook, setSelectedBook] = useState(null);
@@ -38,12 +45,20 @@ export default function BookTracker() {
   const [filterStatus, setFilterStatus] = useState('all');
   const [sortBy, setSortBy] = useState('recent');
 
-  const filteredAndSortedBooks = books
+  const filteredAndSortedBooks = (Array.isArray(books) ? books : [])
     .filter(book => {
-      const genres = book.genre || book.categories || [];
-      const matchesSearch = book.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        book.author.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        genres.some(g => String(g).toLowerCase().includes(searchQuery.toLowerCase()));
+      const genres = Array.isArray(book.genre)
+        ? book.genre
+        : Array.isArray(book.categories)
+        ? book.categories
+        : [];
+      const title = typeof book.title === 'string' ? book.title : '';
+      const author = typeof book.author === 'string' ? book.author : '';
+      const query = searchQuery.toLowerCase();
+      const matchesSearch =
+        title.toLowerCase().includes(query) ||
+        author.toLowerCase().includes(query) ||
+        genres.some((g) => String(g).toLowerCase().includes(query));
       const matchesFilter = filterStatus === 'all' || book.status === filterStatus;
       return matchesSearch && matchesFilter;
     })
@@ -256,13 +271,18 @@ export default function BookTracker() {
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                   {filteredAndSortedBooks.map((book) => (
-                    <BookCard
+                    <LibraryBookCard
                       key={book.id || book._id}
                       book={book}
                       onBookClick={handleBookClick}
                       onBookEdit={handleBookEdit}
                       onReactionClick={handleReactionClick}
                       onProgressUpdate={handleProgressUpdate}
+                      onReadUploaded={
+                        book.type === 'uploaded'
+                          ? () => navigate(`/reader/${book.id || book._id}`)
+                          : undefined
+                      }
                     />
                   ))}
                 </div>

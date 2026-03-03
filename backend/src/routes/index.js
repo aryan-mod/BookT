@@ -1,8 +1,9 @@
 const express = require('express');
 const authRoutes = require('./authRoutes');
-const bookRoutes = require('./bookRoutes');
+const bookRoutes = require('./book.routes');
 const bookRequestRoutes = require('./bookRequestRoutes');
 const adminRoutes = require('./adminRoutes');
+const readerRoutes = require('./reader.routes');
 
 const router = express.Router();
 
@@ -10,6 +11,7 @@ router.use('/auth', authRoutes);
 router.use('/books', bookRoutes);
 router.use('/book-requests', bookRequestRoutes);
 router.use('/admin', adminRoutes);
+router.use('/reader', readerRoutes);
 
 /**
  * Lightweight health/debug endpoint.

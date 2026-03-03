@@ -31,11 +31,10 @@ export const useBooks = () => {
       setLoading(true);
       setError(null);
       const response = await api.get('/books');
-      const raw = response.data?.data?.books;
+      const raw = response.data?.data;
       const list = Array.isArray(raw) ? raw : [];
-      setBooks(list.map(normalizeBook));
+      setBooks(list.map(normalizeBook).filter(Boolean));
     } catch (err) {
-      console.error('Error fetching books:', err);
       setError(getErrorMessage(err));
       setBooks([]);
     } finally {

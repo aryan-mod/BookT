@@ -1,5 +1,18 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { X, Star, Clock, BookOpen, Heart, MessageCircle, Share2, ChevronLeft, ChevronRight, Quote, Edit, Plus } from 'lucide-react';
+import {
+  X,
+  Star,
+  Clock,
+  BookOpen,
+  Heart,
+  MessageCircle,
+  Share2,
+  ChevronLeft,
+  ChevronRight,
+  Quote,
+  Edit,
+  Plus,
+} from 'lucide-react';
 import { gsap } from 'gsap';
 
 const BookModal = ({ book, isOpen, onClose, onReactionClick, onEdit }) => {
@@ -9,7 +22,13 @@ const BookModal = ({ book, isOpen, onClose, onReactionClick, onEdit }) => {
   const [selectedEmoji, setSelectedEmoji] = useState('');
   const [newNote, setNewNote] = useState('');
 
-  const reviewSteps = book?.review ? book.review.split('. ').filter(step => step.length > 10) : [];
+  const reviewSteps =
+    book?.review && typeof book.review === 'string'
+      ? book.review
+          .split('. ')
+          .map((step) => step.trim())
+          .filter((step) => step.length > 10)
+      : [];
   const availableEmojis = ['❤️', '😭', '🤔', '💪', '🎯', '✨', '📚', '🌟', '🔥', '👏', '😍', '🤯', '💡', '🙌'];
 
   useEffect(() => {
@@ -44,6 +63,7 @@ const BookModal = ({ book, isOpen, onClose, onReactionClick, onEdit }) => {
   };
 
   const handleReaction = (emoji) => {
+    if (!book || !book.id || typeof onReactionClick !== 'function') return;
     setSelectedEmoji(emoji);
     onReactionClick(book.id, emoji);
     
@@ -58,19 +78,28 @@ const BookModal = ({ book, isOpen, onClose, onReactionClick, onEdit }) => {
   };
 
   const handleEdit = () => {
-    onEdit(book);
+    if (typeof onEdit === 'function' && book) {
+      onEdit(book);
+    }
     handleClose();
   };
 
   const addQuickNote = () => {
     if (newNote.trim()) {
-      // This would typically update the book's notes
-      console.log('Adding note:', newNote);
       setNewNote('');
     }
   };
 
   if (!isOpen || !book) return null;
+
+  const title = typeof book.title === 'string' ? book.title : 'Untitled';
+  const author = typeof book.author === 'string' ? book.author : '';
+  const pages = Number.isFinite(book.pages) ? book.pages : book.pages || null;
+  const genreList = Array.isArray(book.genre ?? book.categories)
+    ? (book.genre ?? book.categories)
+    : [];
+  const highlights = Array.isArray(book.highlights) ? book.highlights : [];
+  const reactions = book.reactions || {};
 
   return (
     <div
@@ -102,28 +131,30 @@ const BookModal = ({ book, isOpen, onClose, onReactionClick, onEdit }) => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-0">
             <div className="relative">
               <img
-                src={book.cover}
-                alt={book.title}
+                src={book.thumbnail || book.cover}
+                alt={title}
                 className="w-full h-64 md:h-96 object-cover"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
               
               {/* Reading Progress Overlay */}
-              {book.status === 'reading' && book.currentPage && (
+              {book.status === 'reading' && book.currentPage && pages && (
                 <div className="absolute bottom-4 left-4 right-4">
                   <div className="bg-white/20 backdrop-blur-sm rounded-lg p-3">
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-white text-sm font-medium">Reading Progress</span>
-                      <span className="text-white text-sm">{Math.round((book.currentPage / book.pages) * 100)}%</span>
+                      <span className="text-white text-sm">
+                        {Math.round((book.currentPage / pages) * 100)}%
+                      </span>
                     </div>
                     <div className="bg-white/20 rounded-full h-2">
                       <div 
                         className="bg-blue-500 h-2 rounded-full transition-all duration-500"
-                        style={{ width: `${(book.currentPage / book.pages) * 100}%` }}
+                        style={{ width: `${(book.currentPage / pages) * 100}%` }}
                       ></div>
                     </div>
                     <p className="text-white text-xs mt-1">
-                      Page {book.currentPage} of {book.pages}
+                      Page {book.currentPage} of {pages}
                     </p>
                   </div>
                 </div>
@@ -133,9 +164,11 @@ const BookModal = ({ book, isOpen, onClose, onReactionClick, onEdit }) => {
             <div className="p-6 overflow-y-auto max-h-96">
               <div className="mb-4">
                 <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-                  {book.title}
+                  {title}
                 </h2>
-                <p className="text-gray-600 dark:text-gray-400 mb-2">by {book.author}</p>
+                {author && (
+                  <p className="text-gray-600 dark:text-gray-400 mb-2">by {author}</p>
+                )}
                 
                 <div className="flex items-center space-x-4 mb-4">
                   {book.rating && (
@@ -153,10 +186,12 @@ const BookModal = ({ book, isOpen, onClose, onReactionClick, onEdit }) => {
                       </span>
                     </div>
                   )}
-                  <div className="flex items-center space-x-1 text-gray-600 dark:text-gray-400">
-                    <BookOpen className="h-4 w-4" />
-                    <span>{book.pages} pages</span>
-                  </div>
+                  {pages && (
+                    <div className="flex items-center space-x-1 text-gray-600 dark:text-gray-400">
+                      <BookOpen className="h-4 w-4" />
+                      <span>{pages} pages</span>
+                    </div>
+                  )}
                   {book.startDate && (
                     <div className="flex items-center space-x-1 text-gray-600 dark:text-gray-400">
                       <Clock className="h-4 w-4" />
@@ -166,7 +201,7 @@ const BookModal = ({ book, isOpen, onClose, onReactionClick, onEdit }) => {
                 </div>
 
                 <div className="flex flex-wrap gap-2 mb-4">
-                  {book.genre.map((genre, index) => (
+                  {genreList.map((genre, index) => (
                     <span
                       key={index}
                       className="px-3 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-400 text-sm rounded-full"
@@ -201,14 +236,14 @@ const BookModal = ({ book, isOpen, onClose, onReactionClick, onEdit }) => {
                 </div>
               </div>
 
-              {book.highlights && book.highlights.length > 0 && (
+              {highlights.length > 0 && (
                 <div className="mb-6">
                   <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3 flex items-center">
                     <Quote className="h-5 w-5 mr-2" />
-                    Highlights ({book.highlights.length})
+                    Highlights ({highlights.length})
                   </h3>
                   <div className="space-y-3 max-h-40 overflow-y-auto">
-                    {book.highlights.map((highlight, index) => (
+                    {highlights.map((highlight, index) => (
                       <div key={index} className="bg-yellow-50 dark:bg-yellow-900/20 border-l-4 border-yellow-400 p-3 rounded-r-lg">
                         <p className="text-gray-800 dark:text-gray-200 italic mb-1">
                           "{highlight.text}"
@@ -277,12 +312,12 @@ const BookModal = ({ book, isOpen, onClose, onReactionClick, onEdit }) => {
                   React to this book
                 </h3>
                 <div className="flex flex-wrap gap-2">
-                  {availableEmojis.map((emoji) => (
+                    {availableEmojis.map((emoji) => (
                     <button
                       key={emoji}
                       onClick={() => handleReaction(emoji)}
-                      className={`emoji-${emoji.replace(/[^\w]/g, '')} p-2 rounded-full border-2 transition-all duration-200 hover:scale-110 ${
-                        book.reactions && book.reactions[emoji]
+                        className={`emoji-${emoji.replace(/[^\w]/g, '')} p-2 rounded-full border-2 transition-all duration-200 hover:scale-110 ${
+                        reactions && reactions[emoji]
                           ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30'
                           : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'
                       }`}
@@ -293,10 +328,10 @@ const BookModal = ({ book, isOpen, onClose, onReactionClick, onEdit }) => {
                 </div>
               </div>
 
-              {book.reactions && Object.keys(book.reactions).length > 0 && (
+              {reactions && Object.keys(reactions).length > 0 && (
                 <div className="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-gray-700">
                   <div className="flex items-center space-x-3 flex-wrap">
-                    {Object.entries(book.reactions).map(([emoji, count]) => (
+                    {Object.entries(reactions).map(([emoji, count]) => (
                       <div key={emoji} className="flex items-center space-x-1 bg-gray-50 dark:bg-gray-700 rounded-full px-2 py-1">
                         <span className="text-lg">{emoji}</span>
                         <span className="text-sm font-medium text-gray-600 dark:text-gray-400">

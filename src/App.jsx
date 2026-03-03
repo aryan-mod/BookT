@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useContext } from 'react';
 import { AuthProvider, AuthContext } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
+import { LibraryProvider } from './context/LibraryContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import AdminProtectedRoute from './components/AdminProtectedRoute';
 import Login from './pages/Login';
@@ -14,6 +15,8 @@ import AdminRequests from './pages/admin/AdminRequests';
 import AdminUsers from './pages/admin/AdminUsers';
 import AdminBooks from './pages/admin/AdminBooks';
 import AdminAnalytics from './pages/admin/AdminAnalytics';
+import Reader from './pages/Reader';
+import UploadPage from './pages/UploadPage';
 
 function AppRoutes() {
   const { user, loading } = useContext(AuthContext);
@@ -40,6 +43,22 @@ function AppRoutes() {
       />
       <Route path="/explore" element={<Explore />} />
       <Route
+        path="/upload"
+        element={
+          <ProtectedRoute>
+            <UploadPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/reader/:bookId"
+        element={
+          <ProtectedRoute>
+            <Reader />
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/admin"
         element={
           <AdminProtectedRoute>
@@ -63,9 +82,11 @@ function App() {
   return (
     <AuthProvider>
       <ToastProvider>
-        <BrowserRouter>
-          <AppRoutes />
-        </BrowserRouter>
+        <LibraryProvider>
+          <BrowserRouter>
+            <AppRoutes />
+          </BrowserRouter>
+        </LibraryProvider>
       </ToastProvider>
     </AuthProvider>
   );

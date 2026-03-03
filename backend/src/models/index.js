@@ -4,6 +4,9 @@ const Book = require('./Book');
 const BookRequest = require('./BookRequest');
 const AdminAction = require('./AdminAction');
 const ReadingProgress = require('./ReadingProgress');
+const UploadedBook = require('./UploadedBook');
+const UploadedBookReadingProgress = require('./UploadedBookReadingProgress');
+const UploadedBookReadingSession = require('./UploadedBookReadingSession');
 const Note = require('./Note');
 const Highlight = require('./Highlight');
 const ReadingSession = require('./ReadingSession');
@@ -16,6 +19,9 @@ module.exports = {
   BookRequest,
   AdminAction,
   ReadingProgress,
+  UploadedBook,
+  UploadedBookReadingProgress,
+  UploadedBookReadingSession,
   Note,
   Highlight,
   ReadingSession,

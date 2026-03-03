@@ -1,15 +1,20 @@
 import React, { useEffect, useRef } from 'react';
 import { gsap } from 'gsap';
 
-const WordCloud = ({ books = [] }) => {
+const WordCloud = ({ books }) => {
   const cloudRef = useRef(null);
 
-  // Generate genre data from books
   const generateGenreData = () => {
+    const safeBooks = Array.isArray(books) ? books : [];
     const genreCount = {};
-    
-    books.forEach(book => {
-      book.genre.forEach(genre => {
+
+    safeBooks.forEach((book) => {
+      const genres = Array.isArray(book.genre ?? book.categories)
+        ? book.genre ?? book.categories
+        : [];
+      genres.forEach((g) => {
+        const genre = typeof g === 'string' ? g.trim() : '';
+        if (!genre) return;
         genreCount[genre] = (genreCount[genre] || 0) + 1;
       });
     });
@@ -118,7 +123,7 @@ const WordCloud = ({ books = [] }) => {
       
       <div className="mt-4 text-center">
         <p className="text-sm text-gray-600 dark:text-gray-400">
-          Your most read genres • {books.length} total books
+          Your most read genres • {(Array.isArray(books) ? books.length : 0)} total books
         </p>
       </div>
     </div>

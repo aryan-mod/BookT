@@ -47,17 +47,6 @@ export function AuthProvider({ children }) {
     }
   }, [setAccessToken]);
 
-  // Debug: ensure role is present (remove after verifying Admin panel works)
-  useEffect(() => {
-    if (process.env.NODE_ENV === 'development' && user) {
-      console.log('AuthContext user:', {
-        id: user._id,
-        name: user.name,
-        role: user.role,
-      });
-    }
-  }, [user]);
-
   useEffect(() => {
     loadUser();
   }, [loadUser]);

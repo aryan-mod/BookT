@@ -1,6 +1,9 @@
-const { Book, ReadingProgress } = require('../models');
+const { Book, ReadingProgress, UploadedBook } = require('../models');
 const AppError = require('../utils/AppError');
 const catchAsync = require('../utils/catchAsync');
+
+// Alias to match common naming used across Node/Express projects.
+const asyncHandler = catchAsync;
 
 /** Book metadata fields only (for create/update). */
 const BOOK_META_FIELDS = ['title', 'author', 'pages', 'cover', 'genre', 'description'];
@@ -68,34 +71,121 @@ exports.getExploreBooks = catchAsync(async (req, res, next) => {
 
 /**
  * GET /books
- * With auth: returns books that the user has progress for, with progress joined.
- * Without auth: returns all books (no progress).
+ * Returns a unified, normalized list of books:
+ * - external books from `Book`/`ReadingProgress`
+ * - uploaded PDF books from `UploadedBook`
+ *
+ * Response:
+ * {
+ *   success: true,
+ *   data: Array<{
+ *     id: string;
+ *     title: string;
+ *     authors: string[];
+ *     thumbnail: string | null;
+ *     createdAt: string;
+ *     type: "external" | "uploaded";
+ *   }>
+ * }
  */
-exports.getAllBooks = catchAsync(async (req, res, next) => {
-  if (req.user) {
-    const progresses = await ReadingProgress.find({ user: req.user._id })
+exports.getAllBooks = asyncHandler(async (req, res, next) => {
+  const userId = req.user && req.user._id;
+
+  const normalizeExternal = (bookDoc, progressDoc) => {
+    if (!bookDoc) return null;
+    const merged = mergeBookWithProgress(bookDoc, progressDoc);
+    const id = merged.id || merged._id;
+    const title =
+      typeof merged.title === 'string' && merged.title.trim().length > 0
+        ? merged.title.trim()
+        : 'Untitled';
+
+    const authorsRaw = Array.isArray(merged.authors)
+      ? merged.authors
+      : typeof merged.author === 'string' && merged.author.trim()
+      ? [merged.author.trim()]
+      : [];
+
+    const authors = authorsRaw
+      .map((a) => (typeof a === 'string' ? a.trim() : ''))
+      .filter(Boolean);
+
+    const thumbnail =
+      typeof merged.coverImage === 'string' && merged.coverImage.trim().length > 0
+        ? merged.coverImage.trim()
+        : typeof merged.cover === 'string' && merged.cover.trim().length > 0
+        ? merged.cover.trim()
+        : null;
+
+    const createdAt =
+      merged.createdAt instanceof Date
+        ? merged.createdAt
+        : merged.startDate instanceof Date
+        ? merged.startDate
+        : new Date(id ? String(id).toString().substring(0, 8) : Date.now());
+
+    return {
+      id,
+      title,
+      authors,
+      thumbnail,
+      createdAt,
+      type: 'external',
+    };
+  };
+
+  const normalizeUploaded = (doc) => {
+    if (!doc) return null;
+    const id = doc._id || doc.id;
+    const title =
+      typeof doc.title === 'string' && doc.title.trim().length > 0
+        ? doc.title.trim()
+        : 'Untitled PDF';
+
+    const createdAt =
+      doc.createdAt instanceof Date ? doc.createdAt : new Date(Date.now());
+
+    return {
+      id,
+      title,
+      authors: [],
+      thumbnail: null,
+      createdAt,
+      type: 'uploaded',
+    };
+  };
+
+  let external = [];
+  if (userId) {
+    const progresses = await ReadingProgress.find({ user: userId })
       .populate('book')
       .sort('-updatedAt');
-    const books = progresses
-      .filter((p) => p.book)
-      .map((p) => mergeBookWithProgress(p.book, p));
-    return res.status(200).json({
-      status: 'success',
-      results: books.length,
-      data: { books },
-    });
+    external = progresses
+      .filter((p) => p && p.book)
+      .map((p) => normalizeExternal(p.book, p))
+      .filter(Boolean);
+  } else {
+    const books = await Book.find().sort('-createdAt');
+    external = books.map((b) => normalizeExternal(b, null)).filter(Boolean);
   }
-  const books = await Book.find().sort('-createdAt');
-  const normalized = books.map((b) => {
-    const o = { ...b.toObject(), id: b._id };
-    if (o.cover != null) o.coverImage = o.cover;
-    if (o.genre != null) o.categories = o.genre;
-    return o;
+
+  let uploaded = [];
+  if (userId) {
+    const uploadedDocs = await UploadedBook.find({ user: userId }).sort('-createdAt').lean();
+    uploaded = Array.isArray(uploadedDocs)
+      ? uploadedDocs.map((u) => normalizeUploaded(u)).filter(Boolean)
+      : [];
+  }
+
+  const unified = [...external, ...uploaded].sort((a, b) => {
+    const aTime = a && a.createdAt ? new Date(a.createdAt).getTime() : 0;
+    const bTime = b && b.createdAt ? new Date(b.createdAt).getTime() : 0;
+    return bTime - aTime;
   });
+
   res.status(200).json({
-    status: 'success',
-    results: normalized.length,
-    data: { books: normalized },
+    success: true,
+    data: unified,
   });
 });
 
@@ -206,12 +296,167 @@ exports.addToLibrary = catchAsync(async (req, res, next) => {
   const progressInput = pick(req.body, PROGRESS_FIELDS);
   const progress = await ReadingProgress.findOneAndUpdate(
     { user: req.user._id, book: bookId },
-    { ...progressInput, currentPage: progressInput.currentPage ?? 0, status: progressInput.status || 'reading' },
+    {
+      ...progressInput,
+      currentPage: progressInput.currentPage ?? 0,
+      status: progressInput.status || 'reading',
+    },
     { upsert: true, new: true, runValidators: true }
   );
   const data = mergeBookWithProgress(book, progress);
   res.status(201).json({
     status: 'success',
     data: { book: data },
+  });
+});
+
+/**
+ * POST /books/add-external (protected)
+ * Creates a Book from external metadata and attaches it to the user's library.
+ * Prevents duplicates per user based on (externalSource, externalId).
+ */
+exports.addExternalBook = catchAsync(async (req, res, next) => {
+  const userId = req.user && req.user._id;
+  if (!userId) {
+    return next(
+      new AppError('You are not logged in. Please log in to add books to your library.', 401)
+    );
+  }
+
+  const rawId = req.body && req.body.id;
+  const rawSource = req.body && req.body.source;
+
+  const externalId =
+    typeof rawId === 'string' ? rawId.trim() : rawId != null ? String(rawId).trim() : '';
+  const externalSource =
+    typeof rawSource === 'string' ? rawSource.trim() : rawSource != null ? String(rawSource).trim() : '';
+
+  if (!externalId || !externalSource) {
+    return next(new AppError('Missing external book identifier.', 400));
+  }
+
+  if (!['google', 'open-library'].includes(externalSource)) {
+    return next(new AppError('Unsupported book source.', 400));
+  }
+
+  const existing = await ReadingProgress.findOne({
+    user: userId,
+    externalId,
+    externalSource,
+  }).select('_id');
+
+  if (existing) {
+    return res.status(409).json({
+      success: false,
+      message: 'Book already in library',
+    });
+  }
+
+  const title =
+    typeof req.body.title === 'string' && req.body.title.trim().length > 0
+      ? req.body.title.trim()
+      : 'Untitled';
+
+  let author = '';
+  if (Array.isArray(req.body.authors) && req.body.authors.length > 0) {
+    author = req.body.authors.filter(Boolean).join(', ');
+  } else if (typeof req.body.author === 'string') {
+    author = req.body.author;
+  }
+  author = author && author.trim().length > 0 ? author.trim() : 'Unknown';
+
+  const pages =
+    typeof req.body.pageCount === 'number' && Number.isFinite(req.body.pageCount)
+      ? req.body.pageCount
+      : 0;
+
+  const cover =
+    typeof req.body.thumbnail === 'string' && req.body.thumbnail.trim().length > 0
+      ? req.body.thumbnail.trim()
+      : '';
+
+  const description =
+    typeof req.body.description === 'string' ? req.body.description : '';
+
+  const book = await Book.create({
+    title,
+    author,
+    pages,
+    cover,
+    description,
+  });
+
+  const progress = await ReadingProgress.create({
+    user: userId,
+    book: book._id,
+    externalId,
+    externalSource,
+    currentPage: 0,
+    status: 'reading',
+  });
+
+  const data = mergeBookWithProgress(book, progress);
+
+  res.status(201).json({
+    status: 'success',
+    data: { book: data },
+  });
+});
+
+/**
+ * GET /books/user-external-ids (protected)
+ * Returns the set of external keys already in the user's library.
+ * Format: `${source}:${id}` – does not expose internal database identifiers.
+ */
+exports.getUserExternalIds = asyncHandler(async (req, res, next) => {
+  const userId = req.user && req.user._id;
+  if (!userId) {
+    return next(
+      new AppError('You are not logged in. Please log in to access your library.', 401)
+    );
+  }
+
+  // ReadingProgress is the source of truth for external books.
+  // Do not query UploadedBookReadingProgress here.
+  const progresses = await ReadingProgress.find({
+    user: userId,
+    externalId: { $exists: true, $nin: [null, ''] },
+    $or: [
+      { externalSource: { $exists: true, $nin: [null, ''] } },
+      // Backwards-compat if older docs used `source`.
+      { source: { $exists: true, $nin: [null, ''] } },
+    ],
+  })
+    .select('externalId externalSource source')
+    .lean();
+
+  const keys = (Array.isArray(progresses) ? progresses : [])
+    .map((p) => {
+      const rawExternalId = p && p.externalId;
+      const rawSource = p && (p.externalSource ?? p.source);
+
+      const externalId =
+        typeof rawExternalId === 'string'
+          ? rawExternalId.trim()
+          : rawExternalId != null
+            ? String(rawExternalId).trim()
+            : '';
+
+      const source =
+        typeof rawSource === 'string'
+          ? rawSource.trim()
+          : rawSource != null
+            ? String(rawSource).trim()
+            : '';
+
+      // Ensure both fields exist before mapping.
+      if (!externalId || !source) return null;
+      return `${source}:${externalId}`;
+    })
+    .filter(Boolean);
+
+  res.status(200).json({
+    status: 'success',
+    data: { keys: Array.isArray(keys) ? keys : [] },
   });
 });

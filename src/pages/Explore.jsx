@@ -1,311 +1,287 @@
-import { useState, useEffect, useContext } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import { BookOpen, Plus, Send, X } from 'lucide-react';
-import { useTheme } from '../hooks/useTheme';
-import { AuthContext } from '../context/AuthContext';
-import { ToastContext } from '../context/ToastContext';
+import React, { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import api from '../api/axios';
-import Header from '../components/Header';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-  DialogClose,
-} from '../components/ui/Dialog';
-import { Button } from '../components/ui/Button';
-import { Input } from '../components/ui/Input';
-import { Label } from '../components/ui/Label';
+import SearchBar from '../components/SearchBar';
+import BookCard from '../components/BookCard';
+import BookSkeleton from '../components/BookSkeleton';
+import EmptyState from '../components/EmptyState';
+import useDebounce from '../hooks/useDebounce';
+import { ToastContext } from '../context/ToastContext';
+import { LibraryContext } from '../context/LibraryContext';
 
-const requestBookSchema = z.object({
-  title: z.string().min(1, 'Title is required').max(200),
-  author: z.string().min(1, 'Author is required').max(200),
-  pages: z.coerce.number().min(0).optional().default(0),
-  description: z.string().max(2000).optional().default(''),
-});
-
-function normalizeBook(book) {
-  if (!book) return null;
-  return { ...book, id: book.id || book._id };
+function getBookKey(book) {
+  const id = typeof book?.id === 'string' ? book.id : '';
+  const source = typeof book?.source === 'string' ? book.source : '';
+  return `${source}:${id}`;
 }
 
-function getErrorMessage(err) {
-  const msg = err.response?.data?.message;
-  if (Array.isArray(msg)) return msg.join(', ');
-  if (typeof msg === 'string') return msg;
-  return err.message || 'Request failed';
+function getFriendlyError(err) {
+  const code = err?.code;
+  if (code === 'ERR_CANCELED') return null;
+
+  const status = err?.response?.status;
+  if (status === 429) return 'Too many requests. Please slow down and try again.';
+  if (status === 401) return 'Please sign in to add books to your library.';
+  if (status === 503) return 'Search is temporarily unavailable. Please try again shortly.';
+
+  const msg = err?.response?.data?.message;
+  if (typeof msg === 'string' && msg.trim().length > 0) return msg.trim();
+
+  return 'Something went wrong. Please try again.';
 }
 
 export default function Explore() {
-  const { user, logout } = useContext(AuthContext);
   const { showToast } = useContext(ToastContext) || {};
-  const navigate = useNavigate();
-  const { theme, toggleTheme } = useTheme();
-  const [books, setBooks] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [addingId, setAddingId] = useState(null);
-  const [requestDialogOpen, setRequestDialogOpen] = useState(false);
+  const library = useContext(LibraryContext);
+  const addedSet = library?.addedSet || new Set();
+  const addToSet = library?.addToSet;
+  const initializeFromBackend = library?.initializeFromBackend;
 
-  const {
-    register,
-    handleSubmit,
-    reset,
-    formState: { errors, isSubmitting },
-  } = useForm({
-    resolver: zodResolver(requestBookSchema),
-    defaultValues: { title: '', author: '', pages: 0, description: '' },
-  });
+  const [query, setQuery] = useState('');
+  const debouncedQuery = useDebounce(query, 500);
 
-  const fetchExploreBooks = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const response = await api.get('/books/explore');
-      const raw = response.data?.data?.books;
-      const list = Array.isArray(raw) ? raw.map(normalizeBook) : [];
-      setBooks(list);
-    } catch (err) {
-      console.error('Error fetching explore books:', err);
-      setError(getErrorMessage(err));
-      setBooks([]);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(9);
+
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const [addingByKey, setAddingByKey] = useState(() => new Map());
+
+  const abortRef = useRef(null);
+  const seqRef = useRef(0);
+
+  const effectiveQuery = useMemo(
+    () => (String(debouncedQuery || '').trim() || 'bestsellers'),
+    [debouncedQuery]
+  );
 
   useEffect(() => {
-    fetchExploreBooks();
+    if (page === 1) return;
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [page]);
+
+  useEffect(() => {
+    initializeFromBackend && initializeFromBackend();
+  }, [initializeFromBackend]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [query]);
+
+  const clearSearch = useCallback(() => {
+    setQuery('');
+    setError('');
+    setPage(1);
   }, []);
 
-  const handleAddToLibrary = async (book) => {
-    if (!user) {
-      navigate('/login', { replace: true });
-      return;
-    }
-    const bookId = book.id || book._id;
-    try {
-      setAddingId(bookId);
-      setError(null);
-      await api.post(`/books/${bookId}/add-to-library`, {
-        currentPage: 0,
-        status: 'reading',
+  useEffect(() => {
+    const controller = new AbortController();
+    abortRef.current?.abort?.();
+    abortRef.current = controller;
+
+    const mySeq = ++seqRef.current;
+
+    (async () => {
+      setLoading(true);
+      setError('');
+
+      try {
+        const res = await api.get('/books/search', {
+          params: { q: effectiveQuery, page, limit },
+          signal: controller.signal,
+        });
+
+        if (seqRef.current !== mySeq) return;
+
+        const data = res?.data?.data;
+        const list = Array.isArray(data) ? data : [];
+        setItems(list);
+      } catch (err) {
+        if (seqRef.current !== mySeq) return;
+        const msg = getFriendlyError(err);
+        if (msg) {
+          setError(msg);
+          setItems([]);
+        }
+      } finally {
+        if (seqRef.current === mySeq) setLoading(false);
+      }
+    })();
+
+    return () => controller.abort();
+  }, [effectiveQuery, page, limit]);
+
+  const hasNextPage = useMemo(
+    () => Array.isArray(items) && items.length === limit,
+    [items, limit]
+  );
+
+  const handleAdd = useCallback(
+    async (book, keyFromCard) => {
+      const key = keyFromCard || getBookKey(book);
+      if (!key || addedSet.has(key) || addingByKey.has(key)) return;
+
+      setAddingByKey((prev) => {
+        const next = new Map(prev);
+        next.set(key, true);
+        return next;
       });
-      navigate('/dashboard', { replace: true });
-    } catch (err) {
-      console.error('Error adding to library:', err);
-      setError(getErrorMessage(err));
-    } finally {
-      setAddingId(null);
-    }
-  };
 
-  const onSubmitRequest = async (data) => {
-    if (!user) {
-      navigate('/login', { replace: true });
-      return;
-    }
-    try {
-      setError(null);
-      await api.post('/book-requests', {
-        title: data.title,
-        author: data.author,
-        pages: data.pages ? Number(data.pages) : 0,
-        description: data.description || '',
-      });
-      reset();
-      setRequestDialogOpen(false);
-      showToast?.('Book request submitted. An admin will review it shortly.', 'success');
-    } catch (err) {
-      setError(getErrorMessage(err));
-    }
-  };
+      try {
+        await api.post('/books/add-external', {
+          id: book?.id,
+          source: book?.source,
+          title: book?.title,
+          authors: book?.authors,
+          description: book?.description,
+          thumbnail: book?.thumbnail,
+          pageCount: book?.pageCount,
+          publishedDate: book?.publishedDate,
+        });
 
-  const handleLogout = () => {
-    logout();
-    navigate('/login', { replace: true });
-  };
+        addToSet && addToSet(key);
+        showToast?.('Added to your library.');
+      } catch (err) {
+        if (err?.response?.status === 409) {
+          addToSet && addToSet(key);
+          showToast?.('Already in library');
+        } else {
+          const msg = getFriendlyError(err);
+          showToast?.(msg || 'Unable to add book.');
+        }
+      } finally {
+        setAddingByKey((prev) => {
+          const next = new Map(prev);
+          next.delete(key);
+          return next;
+        });
+      }
+    },
+    [addedSet, addingByKey, addToSet, showToast]
+  );
 
-  const coverUrl = (book) => book?.cover || book?.coverImage || '';
+  const isNoResults = !loading && !error && items.length === 0;
+  const isTrending = effectiveQuery === 'bestsellers';
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 dark:from-gray-900 dark:to-blue-900 transition-colors duration-300">
-      <Header
-        theme={theme}
-        toggleTheme={toggleTheme}
-        searchQuery=""
-        setSearchQuery={() => {}}
-        onAddBook={() => navigate('/dashboard')}
-        user={user}
-        onLogout={handleLogout}
-      />
-
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 dark:from-gray-900 dark:to-blue-950 transition-colors">
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex items-center justify-between gap-4 mb-8 flex-wrap">
-          <div className="flex items-center gap-2">
-            <BookOpen className="h-8 w-8 text-blue-600 dark:text-blue-400" />
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Explore Books</h1>
+        <div className="flex items-end justify-between gap-4 flex-wrap">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
+              Explore
+            </h1>
+            <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+              Search across Google Books and Open Library, then add to your library.
+            </p>
           </div>
-          {user && (
-            <Button
-              variant="primary"
-              onClick={() => setRequestDialogOpen(true)}
-            >
-              <Plus className="h-4 w-4" />
-              Request a book
-            </Button>
+
+          <div className="flex items-center gap-3">
+            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+              <span className="sr-only">Results per page</span>
+              <select
+                value={limit}
+                onChange={(e) => {
+                  const next = Number(e.target.value);
+                  setLimit(Number.isFinite(next) ? next : 9);
+                  setPage(1);
+                }}
+                className="h-11 rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 text-sm text-gray-900 dark:text-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value={6}>6</option>
+                <option value={9}>9</option>
+                <option value={12}>12</option>
+              </select>
+            </label>
+          </div>
+        </div>
+
+        <div className="mt-6">
+          <SearchBar
+            value={query}
+            onChange={setQuery}
+            onClear={clearSearch}
+            placeholder="Search by title, author, or keyword…"
+          />
+        </div>
+
+        {error ? (
+          <div
+            className="mt-6 rounded-2xl border border-red-200 dark:border-red-900/40 bg-red-50 dark:bg-red-950/30 px-4 py-3 text-sm text-red-800 dark:text-red-200"
+            role="alert"
+          >
+            {error}
+          </div>
+        ) : null}
+
+        <div className="mt-8">
+          {isNoResults ? (
+            <EmptyState
+              variant="no-results"
+              title={isTrending ? 'No trending books available' : 'No results found'}
+              description={
+                isTrending
+                  ? 'Try again later or search for something specific.'
+                  : 'Try a different query, or broaden your search terms.'
+              }
+              actionLabel={isTrending ? undefined : 'Clear search'}
+              onAction={isTrending ? undefined : clearSearch}
+            />
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {loading
+                ? Array.from({ length: limit }).map((_, idx) => <BookSkeleton key={idx} />)
+                : items.map((book) => {
+                    const key = getBookKey(book);
+                    const isAdded = addedSet.has(key);
+                    const isAdding = addingByKey.has(key);
+                    return (
+                      <BookCard
+                        key={key}
+                        book={book}
+                        onAdd={handleAdd}
+                        isAdded={isAdded}
+                        isAdding={isAdding}
+                      />
+                    );
+                  })}
+            </div>
           )}
         </div>
 
-        {error && (
-          <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-red-800 dark:text-red-200">
-            {error}
-          </div>
-        )}
+        {!loading && items.length > 0 ? (
+          <div className="mt-10 flex items-center justify-between gap-4">
+            <button
+              type="button"
+              onClick={() => {
+                if (loading) return;
+                setPage((p) => Math.max(1, p - 1));
+              }}
+              disabled={page <= 1 || loading}
+              className="inline-flex items-center justify-center rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-2 text-sm font-semibold text-gray-900 dark:text-white shadow-sm hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Previous
+            </button>
 
-        {loading && (
-          <div className="flex justify-center py-12">
-            <div className="animate-spin h-12 w-12 border-4 border-blue-500 border-t-transparent rounded-full" />
-          </div>
-        )}
+            <div className="text-sm text-gray-600 dark:text-gray-400">
+              Page <span className="font-semibold text-gray-900 dark:text-white">{page}</span>
+            </div>
 
-        {!loading && books.length === 0 && !error && (
-          <div className="text-center py-12 text-gray-600 dark:text-gray-400">
-            No books in the catalogue yet.
+            <button
+              type="button"
+              onClick={() => {
+                if (loading || !hasNextPage) return;
+                setPage((p) => p + 1);
+              }}
+              disabled={!hasNextPage || loading}
+              className="inline-flex items-center justify-center rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-2 text-sm font-semibold text-gray-900 dark:text-white shadow-sm hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Next
+            </button>
           </div>
-        )}
-
-        {!loading && books.length > 0 && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {books.map((book) => (
-              <div
-                key={book.id || book._id}
-                className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg dark:shadow-gray-900/20 overflow-hidden transition-all duration-300 hover:shadow-xl dark:hover:shadow-gray-900/40 flex flex-col"
-              >
-                <div className="relative aspect-[3/4] bg-gray-200 dark:bg-gray-700">
-                  {coverUrl(book) ? (
-                    <img
-                      src={coverUrl(book)}
-                      alt={book.title}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <BookOpen className="h-16 w-16 text-gray-400 dark:text-gray-500" />
-                    </div>
-                  )}
-                </div>
-                <div className="p-4 flex-1 flex flex-col">
-                  <h2 className="font-semibold text-gray-900 dark:text-white line-clamp-2 mb-1">
-                    {book.title}
-                  </h2>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">{book.author}</p>
-                  {(book.genre?.length > 0 || book.categories?.length > 0) && (
-                    <p className="text-xs text-gray-500 dark:text-gray-500 mb-2">
-                      {(book.genre || book.categories || []).join(', ')}
-                    </p>
-                  )}
-                  {book.pages > 0 && (
-                    <p className="text-xs text-gray-500 dark:text-gray-500 mb-3">
-                      {book.pages} pages
-                    </p>
-                  )}
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleAddToLibrary(book);
-                    }}
-                    disabled={addingId === (book.id || book._id)}
-                    className="mt-auto flex items-center justify-center gap-2 w-full py-2.5 px-4 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 font-medium text-sm"
-                  >
-                    {addingId === (book.id || book._id) ? (
-                      <span className="animate-pulse">Adding…</span>
-                    ) : (
-                      <>
-                        <Plus className="h-4 w-4" />
-                        Add to Library
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+        ) : null}
       </main>
-
-      <Dialog open={requestDialogOpen} onOpenChange={setRequestDialogOpen}>
-        <DialogContent>
-          <DialogClose onClick={() => setRequestDialogOpen(false)}><X className="h-5 w-5" /></DialogClose>
-          <DialogHeader>
-            <DialogTitle>Request a book</DialogTitle>
-            <DialogDescription>
-              Suggest a book for the global catalogue. An admin will review your request.
-            </DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleSubmit(onSubmitRequest)} className="space-y-4 px-6 pb-6">
-            <div>
-              <Label htmlFor="request-title" className="block mb-1.5">Title</Label>
-              <Input
-                id="request-title"
-                {...register('title')}
-                placeholder="Book title"
-                className={errors.title ? 'border-red-500' : ''}
-              />
-              {errors.title && (
-                <p className="mt-1 text-xs text-red-600 dark:text-red-400">{errors.title.message}</p>
-              )}
-            </div>
-            <div>
-              <Label htmlFor="request-author" className="block mb-1.5">Author</Label>
-              <Input
-                id="request-author"
-                {...register('author')}
-                placeholder="Author name"
-                className={errors.author ? 'border-red-500' : ''}
-              />
-              {errors.author && (
-                <p className="mt-1 text-xs text-red-600 dark:text-red-400">{errors.author.message}</p>
-              )}
-            </div>
-            <div>
-              <Label htmlFor="request-pages" className="block mb-1.5">Pages (optional)</Label>
-              <Input
-                id="request-pages"
-                type="number"
-                min={0}
-                {...register('pages')}
-                placeholder="0"
-              />
-            </div>
-            <div>
-              <Label htmlFor="request-description" className="block mb-1.5">Description (optional)</Label>
-              <textarea
-                id="request-description"
-                {...register('description')}
-                placeholder="Brief description"
-                rows={3}
-                className="flex w-full rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setRequestDialogOpen(false)}>
-                Cancel
-              </Button>
-              <Button type="submit" variant="primary" loading={isSubmitting} disabled={isSubmitting}>
-                <Send className="h-4 w-4" />
-                Submit request
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

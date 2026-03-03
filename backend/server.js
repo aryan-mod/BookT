@@ -1,4 +1,8 @@
 require('dotenv').config();
+
+// Validate Cloudinary config on startup (throws if env missing)
+require('./config/cloudinary');
+
 const app = require('./src/app');
 const connectDB = require('./src/config/db');
 
