@@ -3,19 +3,22 @@ import { useNavigate } from 'react-router-dom';
 import { gsap } from 'gsap';
 import { AuthContext } from '../context/AuthContext';
 import { useTheme } from '../hooks/useTheme';
-import { useLocalStorage } from '../hooks/useLocalStorage';
 import { useBooks } from '../hooks/useBooks';
-import { mockStreakData, suggestedBooks } from '../data/mockData';
+import { suggestedBooks as mockSuggestedBooks } from '../data/mockData';
+import api from '../api/axios';
 
 import Header from './Header';
 import StreakTracker from './StreakTracker';
 import StatsPanel from './StatsPanel';
+import ReadingCharts from './ReadingCharts';
+import ReadingHeatmap from './ReadingHeatmap';
 import LibraryBookCard from './LibraryBookCard';
 import BookModal from './BookModal';
 import AddBookModal from './AddBookModal';
 import EditBookModal from './EditBookModal';
 import WordCloud from './WordCloud';
 import SuggestedBooks from './SuggestedBooks';
+import ReadingActivityFeed from './ReadingActivityFeed';
 
 export default function BookTracker() {
   const { user, logout } = useContext(AuthContext);
@@ -34,7 +37,22 @@ export default function BookTracker() {
     updateBook,
     deleteBook,
   } = useBooks();
-  const [streakData, setStreakData] = useLocalStorage('streakData', mockStreakData);
+  const [streakData, setStreakData] = useState({
+    current: 0,
+    longest: 0,
+    thisWeek: [false, false, false, false, false, false, false],
+  });
+  const [dashboardStats, setDashboardStats] = useState(null);
+  const [activity, setActivity] = useState({ monthlyActivity: [], dailyActivity: [] });
+  const [goalSummary, setGoalSummary] = useState(null);
+  const [goalYearInput, setGoalYearInput] = useState(() => new Date().getFullYear());
+  const [goalTargetInput, setGoalTargetInput] = useState('');
+  const [goalSaving, setGoalSaving] = useState(false);
+  const [goalError, setGoalError] = useState(null);
+  const [suggestions, setSuggestions] = useState(mockSuggestedBooks);
+  const [analyticsLoading, setAnalyticsLoading] = useState(true);
+  const [analyticsError, setAnalyticsError] = useState(null);
+  const [activityFeed, setActivityFeed] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedBook, setSelectedBook] = useState(null);
   const [editingBook, setEditingBook] = useState(null);
@@ -105,8 +123,44 @@ export default function BookTracker() {
   const handleAddBook = async (newBook) => {
     try {
       await addBook(newBook);
-      if (newBook.status === 'reading' && newBook.startDate === new Date().toISOString().split('T')[0]) {
-        updateStreakForToday();
+      // Streak & analytics are server-derived; refresh after mutations.
+      try {
+        const [statsRes, streakRes, activityRes, goalsRes, recsRes, feedRes] =
+          await Promise.all([
+            api.get('/reader/dashboard/stats'),
+            api.get('/reader/dashboard/streak'),
+            api.get('/reader/dashboard/activity'),
+            api.get('/reader/goals'),
+            api.get('/reader/dashboard/recommendations'),
+            api.get('/reader/dashboard/feed'),
+          ]);
+
+        setDashboardStats(statsRes.data?.data || null);
+
+        const streak = streakRes.data?.data;
+        if (streak) {
+          setStreakData({
+            current: streak.current || 0,
+            longest: streak.longest || 0,
+            thisWeek:
+              Array.isArray(streak.thisWeek) && streak.thisWeek.length === 7
+                ? streak.thisWeek
+                : [false, false, false, false, false, false, false],
+          });
+        }
+
+        setActivity(activityRes.data?.data || { monthlyActivity: [], dailyActivity: [] });
+        setActivityFeed(feedRes.data?.data?.items || []);
+
+        const goal = goalsRes.data?.data || null;
+        setGoalSummary(goal);
+
+        const serverSuggestions = recsRes.data?.data?.suggestions;
+        if (Array.isArray(serverSuggestions) && serverSuggestions.length > 0) {
+          setSuggestions(serverSuggestions);
+        }
+      } catch {
+        // Best-effort refresh; ignore to avoid blocking add.
       }
     } catch (err) {
       console.error('Failed to add book:', err);
@@ -117,8 +171,44 @@ export default function BookTracker() {
     try {
       const bookId = updatedBook.id || updatedBook._id;
       await updateBook(bookId, updatedBook);
-      if (updatedBook.status === 'completed' && updatedBook.endDate === new Date().toISOString().split('T')[0]) {
-        updateStreakForToday();
+      // Streak & analytics are server-derived; refresh after mutations.
+      try {
+        const [statsRes, streakRes, activityRes, goalsRes, recsRes, feedRes] =
+          await Promise.all([
+            api.get('/reader/dashboard/stats'),
+            api.get('/reader/dashboard/streak'),
+            api.get('/reader/dashboard/activity'),
+            api.get('/reader/goals'),
+            api.get('/reader/dashboard/recommendations'),
+            api.get('/reader/dashboard/feed'),
+          ]);
+
+        setDashboardStats(statsRes.data?.data || null);
+
+        const streak = streakRes.data?.data;
+        if (streak) {
+          setStreakData({
+            current: streak.current || 0,
+            longest: streak.longest || 0,
+            thisWeek:
+              Array.isArray(streak.thisWeek) && streak.thisWeek.length === 7
+                ? streak.thisWeek
+                : [false, false, false, false, false, false, false],
+          });
+        }
+
+        setActivity(activityRes.data?.data || { monthlyActivity: [], dailyActivity: [] });
+        setActivityFeed(feedRes.data?.data?.items || []);
+
+        const goal = goalsRes.data?.data || null;
+        setGoalSummary(goal);
+
+        const serverSuggestions = recsRes.data?.data?.suggestions;
+        if (Array.isArray(serverSuggestions) && serverSuggestions.length > 0) {
+          setSuggestions(serverSuggestions);
+        }
+      } catch {
+        // Best-effort refresh; ignore to avoid blocking update.
       }
     } catch (err) {
       console.error('Failed to update book:', err);
@@ -138,29 +228,9 @@ export default function BookTracker() {
     if (!book) return;
     try {
       await updateBook(bookId, { ...book, currentPage });
-      updateStreakForToday();
     } catch (err) {
       console.error('Failed to update progress:', err);
     }
-  };
-
-  const updateStreakForToday = () => {
-    const today = new Date().getDay();
-    setStreakData(prevData => {
-      const newWeek = [...(prevData.thisWeek || Array(7).fill(false))];
-      newWeek[today] = true;
-      let currentStreak = 0;
-      for (let i = newWeek.length - 1; i >= 0; i--) {
-        if (newWeek[i]) currentStreak++;
-        else break;
-      }
-      return {
-        ...prevData,
-        thisWeek: newWeek,
-        current: Math.max(currentStreak, prevData.current || 0),
-        longest: Math.max(currentStreak, prevData.longest || 0)
-      };
-    });
   };
 
   useEffect(() => {
@@ -175,6 +245,115 @@ export default function BookTracker() {
     );
   }, []);
 
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchAnalytics = async () => {
+      try {
+        setAnalyticsLoading(true);
+        setAnalyticsError(null);
+
+        const [
+          statsRes,
+          streakRes,
+          activityRes,
+          goalsRes,
+          recsRes,
+          feedRes,
+        ] = await Promise.all([
+          api.get('/reader/dashboard/stats'),
+          api.get('/reader/dashboard/streak'),
+          api.get('/reader/dashboard/activity'),
+          api.get('/reader/goals'),
+          api.get('/reader/dashboard/recommendations'),
+          api.get('/reader/dashboard/feed'),
+        ]);
+
+        if (!isMounted) return;
+
+        setDashboardStats(statsRes.data?.data || null);
+        const streak = streakRes.data?.data;
+        if (streak) {
+          setStreakData({
+            current: streak.current || 0,
+            longest: streak.longest || 0,
+            thisWeek:
+              Array.isArray(streak.thisWeek) && streak.thisWeek.length === 7
+                ? streak.thisWeek
+                : [false, false, false, false, false, false, false],
+          });
+        }
+
+        setActivity(
+          activityRes.data?.data || { monthlyActivity: [], dailyActivity: [] }
+        );
+        setActivityFeed(feedRes.data?.data?.items || []);
+        const goal = goalsRes.data?.data || null;
+        setGoalSummary(goal);
+        if (goal) {
+          setGoalYearInput(goal.year || new Date().getFullYear());
+          setGoalTargetInput(
+            Number.isFinite(goal.targetBooks) && goal.targetBooks > 0
+              ? String(goal.targetBooks)
+              : ''
+          );
+        }
+
+        const serverSuggestions = recsRes.data?.data?.suggestions;
+        if (Array.isArray(serverSuggestions) && serverSuggestions.length > 0) {
+          setSuggestions(serverSuggestions);
+        }
+      } catch (err) {
+        if (!isMounted) return;
+        const msg =
+          err?.response?.data?.message ||
+          err?.message ||
+          'Failed to load dashboard analytics';
+        setAnalyticsError(msg);
+      } finally {
+        if (isMounted) setAnalyticsLoading(false);
+      }
+    };
+
+    fetchAnalytics();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const handleSaveGoal = async (e) => {
+    e?.preventDefault();
+    setGoalError(null);
+    const year = Number(goalYearInput) || new Date().getFullYear();
+    const target = Number(goalTargetInput);
+    if (!Number.isInteger(target) || target <= 0) {
+      setGoalError('Please enter a positive integer for target books.');
+      return;
+    }
+    try {
+      setGoalSaving(true);
+      const res = await api.post('/reader/goals', {
+        year,
+        targetBooks: target,
+      });
+      const goal = res.data?.data || null;
+      if (goal) {
+        setGoalSummary(goal);
+        setGoalYearInput(goal.year || year);
+        setGoalTargetInput(String(goal.targetBooks || target));
+      }
+    } catch (err) {
+      const msg =
+        err?.response?.data?.message ||
+        err?.message ||
+        'Failed to save goal. Please try again.';
+      setGoalError(msg);
+    } finally {
+      setGoalSaving(false);
+    }
+  };
+
   return (
     <>
       <Header
@@ -188,6 +367,11 @@ export default function BookTracker() {
       />
 
       <main className="main-content max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {analyticsError && (
+          <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 mb-6 text-sm text-yellow-900 dark:text-yellow-100">
+            {analyticsError}
+          </div>
+        )}
         {booksLoading && (
           <div className="text-center py-12">
             <div className="text-gray-400 dark:text-gray-500 mb-4">
@@ -206,16 +390,85 @@ export default function BookTracker() {
           </div>
         )}
 
-        {!booksLoading && <StatsPanel books={books} />}
+        {!booksLoading && (
+          <StatsPanel books={books} analytics={dashboardStats} />
+        )}
 
         {!booksLoading && (
           <>
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
-              <div className="lg:col-span-1">
-                <StreakTracker streakData={streakData} onUpdateStreak={updateStreakForToday} />
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-8 mb-8">
+              <div className="xl:col-span-1 space-y-8">
+                <StreakTracker streakData={streakData} />
+                <ReadingActivityFeed items={activityFeed} />
+                <div className="bg-white dark:bg-gray-900 rounded-2xl p-5 shadow-sm border border-gray-100 dark:border-gray-800">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                    {goalSummary?.year || goalYearInput} Reading Goal
+                  </h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+                    {goalSummary
+                      ? `${goalSummary.completedBooks} of ${goalSummary.targetBooks || 0} books completed${
+                          goalSummary.targetBooks ? '' : ' (no goal set yet).'
+                        }`
+                      : 'Set a yearly reading goal to track your progress.'}
+                  </p>
+                  <div className="w-full bg-gray-200 dark:bg-gray-800 h-2 rounded-full overflow-hidden mb-2">
+                    <div
+                      className="bg-blue-500 h-2 transition-all duration-300"
+                      style={{ width: `${goalSummary?.progress || 0}%` }}
+                    />
+                  </div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400 mb-4">
+                    {goalSummary?.progress || 0}% of yearly goal
+                  </div>
+
+                  <form onSubmit={handleSaveGoal} className="space-y-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                          Year
+                        </label>
+                        <input
+                          type="number"
+                          value={goalYearInput}
+                          onChange={(e) => setGoalYearInput(e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                          Target books
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          value={goalTargetInput}
+                          onChange={(e) => setGoalTargetInput(e.target.value)}
+                          placeholder="e.g. 24"
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        />
+                      </div>
+                    </div>
+                    {goalError && (
+                      <p className="text-xs text-red-500 dark:text-red-400">{goalError}</p>
+                    )}
+                    <div className="flex justify-end">
+                      <button
+                        type="submit"
+                        disabled={goalSaving}
+                        className="px-4 py-2 text-xs font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:bg-blue-400 transition-colors"
+                      >
+                        {goalSaving ? 'Saving…' : goalSummary ? 'Update Goal' : 'Set Goal'}
+                      </button>
+                    </div>
+                  </form>
+                </div>
               </div>
-              <div className="lg:col-span-2">
+              <div className="xl:col-span-2 space-y-8">
                 <WordCloud books={books} />
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <ReadingCharts monthlyActivity={activity.monthlyActivity} />
+                  <ReadingHeatmap dailyActivity={activity.dailyActivity} />
+                </div>
               </div>
             </div>
 
@@ -295,7 +548,7 @@ export default function BookTracker() {
       <BookModal book={selectedBook} isOpen={showModal} onClose={() => setShowModal(false)} onReactionClick={handleReactionClick} onEdit={handleBookEdit} />
       <AddBookModal isOpen={showAddModal} onClose={() => setShowAddModal(false)} onAddBook={handleAddBook} />
       <EditBookModal book={editingBook} isOpen={showEditModal} onClose={() => setShowEditModal(false)} onUpdateBook={handleUpdateBook} onDeleteBook={handleDeleteBook} />
-      <SuggestedBooks suggestions={suggestedBooks} isVisible={showSuggestions} onClose={() => setShowSuggestions(false)} onAddBook={handleAddBook} />
+      <SuggestedBooks suggestions={suggestions} isVisible={showSuggestions} onClose={() => setShowSuggestions(false)} onAddBook={handleAddBook} />
     </>
   );
 }

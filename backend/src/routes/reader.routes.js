@@ -2,6 +2,7 @@ const express = require('express');
 const { protect } = require('../middleware/auth');
 const { handleUpload } = require('../middlewares/upload.middleware');
 const readerController = require('../controllers/reader.controller');
+const readerAnalyticsController = require('../controllers/readerAnalytics.controller');
 
 const router = express.Router();
 
@@ -12,6 +13,16 @@ router.post('/session', readerController.createSession);
 router.get('/progress', readerController.getProgress);
 router.patch('/progress', readerController.updateProgress);
 router.post('/progress', readerController.updateProgress);
+
+router.get('/dashboard/stats', readerAnalyticsController.getDashboardStats);
+router.get('/dashboard/streak', readerAnalyticsController.getStreak);
+router.get('/dashboard/activity', readerAnalyticsController.getActivity);
+router.get('/dashboard/feed', readerAnalyticsController.getReadingActivityFeed);
+router.get('/dashboard/recommendations', readerAnalyticsController.getRecommendations);
+router.get('/goals', readerAnalyticsController.getGoalsSummary);
+router.post('/goals', readerAnalyticsController.upsertGoal);
+
 router.get('/:bookId', readerController.getBook);
 
 module.exports = router;
+

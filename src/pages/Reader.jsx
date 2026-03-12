@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-react';
 import api from '../api/axios';
 import PDFViewer from '../components/PDFViewer';
@@ -48,6 +48,7 @@ function getFriendlyError(err) {
 export default function Reader() {
   const { bookId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -58,6 +59,8 @@ export default function Reader() {
   const [saveStatus, setSaveStatus] = useState('idle'); // idle | saving | saved | error
 
   const saveInFlightRef = useRef(false);
+  const sessionSecondsRef = useRef(0);
+  const lastTickRef = useRef(null);
 
   const percentage = useMemo(() => {
     const total = Math.max(1, Number(numPages) || 1);
@@ -74,6 +77,9 @@ export default function Reader() {
       setError('');
 
       try {
+        const params = new URLSearchParams(location.search || '');
+        const requestedPage = Number(params.get('page'));
+
         const [bookRes, progressRes] = await Promise.all([
           api.get(`/reader/${bookId}`, { signal: controller.signal }),
           api.get('/reader/progress', { params: { bookId }, signal: controller.signal }),
@@ -85,10 +91,15 @@ export default function Reader() {
         setBook(b);
 
         const p = progressRes?.data?.data ?? {};
-        const initialPage = Number(p?.currentPage) || 1;
+        const savedPage = Number(p?.currentPage) || 1;
         const initialTotal = Number(p?.totalPages) || 1;
 
-        setCurrentPage(Math.max(1, initialPage));
+        const effective =
+          Number.isFinite(requestedPage) && requestedPage >= 1
+            ? requestedPage
+            : savedPage;
+
+        setCurrentPage(Math.max(1, effective));
         setNumPages(Math.max(1, initialTotal));
       } catch (err) {
         if (!alive) return;
@@ -103,7 +114,7 @@ export default function Reader() {
       alive = false;
       controller.abort();
     };
-  }, [bookId]);
+  }, [bookId, location.search]);
 
   const saveProgress = useCallback(
     async (page, total) => {
@@ -151,6 +162,40 @@ export default function Reader() {
 
   const canPrev = currentPage > 1;
   const canNext = currentPage < numPages;
+
+  useEffect(() => {
+    if (!bookId) return undefined;
+
+    lastTickRef.current = Date.now();
+    const interval = setInterval(() => {
+      const now = Date.now();
+      if (lastTickRef.current != null) {
+        const deltaSeconds = (now - lastTickRef.current) / 1000;
+        if (deltaSeconds > 0) {
+          sessionSecondsRef.current += deltaSeconds;
+        }
+      }
+      lastTickRef.current = now;
+    }, 30000);
+
+    return () => {
+      clearInterval(interval);
+      const now = Date.now();
+      if (lastTickRef.current != null) {
+        const deltaSeconds = (now - lastTickRef.current) / 1000;
+        if (deltaSeconds > 0) {
+          sessionSecondsRef.current += deltaSeconds;
+        }
+      }
+      lastTickRef.current = null;
+      const durationSeconds = Math.round(sessionSecondsRef.current || 0);
+      sessionSecondsRef.current = 0;
+      if (!durationSeconds || durationSeconds <= 0) return;
+      api
+        .post('/reader/session', { bookId, durationInSeconds: durationSeconds })
+        .catch(() => {});
+    };
+  }, [bookId]);
 
   if (loading) {
     return (

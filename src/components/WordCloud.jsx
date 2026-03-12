@@ -1,11 +1,56 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { gsap } from 'gsap';
 
 const WordCloud = ({ books }) => {
   const cloudRef = useRef(null);
 
+  const safeBooks = useMemo(() => (Array.isArray(books) ? books : []), [books]);
+
+  const analytics = useMemo(() => {
+    const genreCounts = new Map();
+    const authorCounts = new Map();
+    const categoryCounts = new Map();
+
+    safeBooks.forEach((book) => {
+      const genres = Array.isArray(book.genre ?? book.categories)
+        ? book.genre ?? book.categories
+        : [];
+      genres.forEach((g) => {
+        const key = typeof g === 'string' ? g.trim() : '';
+        if (!key) return;
+        genreCounts.set(key, (genreCounts.get(key) || 0) + 1);
+        categoryCounts.set(key, (categoryCounts.get(key) || 0) + 1);
+      });
+
+      const author = typeof book.author === 'string' ? book.author.trim() : '';
+      if (author) authorCounts.set(author, (authorCounts.get(author) || 0) + 1);
+    });
+
+    const topGenres = Array.from(genreCounts.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([name, count]) => ({ name, count }));
+
+    const favoriteAuthor = Array.from(authorCounts.entries())
+      .sort((a, b) => b[1] - a[1])[0]?.[0];
+
+    const categoryTotal = Array.from(categoryCounts.values()).reduce(
+      (sum, v) => sum + v,
+      0
+    );
+    const booksPerCategory = Array.from(categoryCounts.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([name, count]) => ({
+        name,
+        count,
+        pct: categoryTotal ? Math.round((count / categoryTotal) * 100) : 0,
+      }));
+
+    return { topGenres, favoriteAuthor, booksPerCategory };
+  }, [safeBooks]);
+
   const generateGenreData = () => {
-    const safeBooks = Array.isArray(books) ? books : [];
     const genreCount = {};
 
     safeBooks.forEach((book) => {
@@ -125,6 +170,50 @@ const WordCloud = ({ books }) => {
         <p className="text-sm text-gray-600 dark:text-gray-400">
           Your most read genres • {(Array.isArray(books) ? books.length : 0)} total books
         </p>
+      </div>
+
+      <div className="mt-5 grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="rounded-xl bg-gray-50 dark:bg-gray-900/40 border border-gray-200 dark:border-gray-700 p-3">
+          <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+            Top genres
+          </div>
+          <div className="text-sm text-gray-900 dark:text-gray-100 font-semibold">
+            {analytics.topGenres.length
+              ? analytics.topGenres.map((g) => g.name).join(', ')
+              : '—'}
+          </div>
+        </div>
+
+        <div className="rounded-xl bg-gray-50 dark:bg-gray-900/40 border border-gray-200 dark:border-gray-700 p-3">
+          <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+            Favorite author
+          </div>
+          <div className="text-sm text-gray-900 dark:text-gray-100 font-semibold truncate">
+            {analytics.favoriteAuthor || '—'}
+          </div>
+        </div>
+
+        <div className="rounded-xl bg-gray-50 dark:bg-gray-900/40 border border-gray-200 dark:border-gray-700 p-3">
+          <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">
+            Books per category
+          </div>
+          {analytics.booksPerCategory.length ? (
+            <div className="space-y-1.5">
+              {analytics.booksPerCategory.slice(0, 3).map((c) => (
+                <div key={c.name} className="flex items-center gap-2">
+                  <div className="text-xs text-gray-700 dark:text-gray-300 truncate flex-1">
+                    {c.name}
+                  </div>
+                  <div className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                    {c.pct}%
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-sm text-gray-600 dark:text-gray-400">—</div>
+          )}
+        </div>
       </div>
     </div>
   );

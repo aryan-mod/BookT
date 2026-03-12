@@ -30,8 +30,10 @@ const SuggestedBooks = ({ suggestions, isVisible, onClose, onAddBook }) => {
       title: suggestion.title,
       author: suggestion.author,
       cover: `https://images.pexels.com/photos/${Math.floor(Math.random() * 1000000)}/pexels-photo-${Math.floor(Math.random() * 1000000)}.jpeg?auto=compress&cs=tinysrgb&w=400`,
-      pages: Math.floor(Math.random() * 400) + 200,
-      genre: ['Fiction'], // Default genre
+      pages: suggestion.pages || Math.floor(Math.random() * 400) + 200,
+      genre: Array.isArray(suggestion.genres) && suggestion.genres.length > 0
+        ? suggestion.genres
+        : ['Fiction'],
       status: 'wishlist',
       rating: 0,
       reactions: {},

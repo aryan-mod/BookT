@@ -8,8 +8,13 @@ const {
   registerLimiter,
   authLimiter,
 } = require('../middleware/security');
+const { apiLimiter } = require('../../config/rateLimit');
 
 const router = express.Router();
+
+// Apply a general API limiter to all auth routes in addition to
+// the more specific per-endpoint limiters from `middleware/security`.
+router.use(apiLimiter);
 
 const registerValidation = [
   body('name').trim().notEmpty().withMessage('Name is required'),

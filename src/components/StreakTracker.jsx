@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { Flame, Calendar, Trophy, Target, CheckCircle } from 'lucide-react';
 import { gsap } from 'gsap';
 
-const StreakTracker = ({ streakData, onUpdateStreak }) => {
+const StreakTracker = ({ streakData }) => {
   const containerRef = useRef(null);
   const flameRef = useRef(null);
   const statsRef = useRef(null);
@@ -41,14 +41,6 @@ const StreakTracker = ({ streakData, onUpdateStreak }) => {
     return streakData.thisWeek[index] ? 'completed' : 'missed';
   };
 
-  const handleDayClick = (index) => {
-    // Allow marking today or past days as complete
-    const today = new Date().getDay();
-    if (index <= today) {
-      onUpdateStreak();
-    }
-  };
-
   const days = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
   const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   const today = new Date().getDay();
@@ -79,8 +71,8 @@ const StreakTracker = ({ streakData, onUpdateStreak }) => {
               {day}
             </div>
             <button
-              onClick={() => handleDayClick(index)}
-              disabled={index > today}
+              type="button"
+              disabled
               className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200 ${
                 getDayStatus(index) === 'completed'
                   ? 'bg-green-500 text-white shadow-lg hover:bg-green-600' 
@@ -124,27 +116,7 @@ const StreakTracker = ({ streakData, onUpdateStreak }) => {
         </div>
       </div>
 
-      {/* Quick Action */}
-      {!streakData.thisWeek[today] && (
-        <div className="mt-4 p-3 bg-orange-100 dark:bg-orange-900/30 rounded-lg border border-orange-200 dark:border-orange-800">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-orange-800 dark:text-orange-200">
-                Keep your streak alive!
-              </p>
-              <p className="text-xs text-orange-600 dark:text-orange-300">
-                Mark today as complete
-              </p>
-            </div>
-            <button
-              onClick={() => handleDayClick(today)}
-              className="px-3 py-1 bg-orange-500 text-white text-sm rounded-lg hover:bg-orange-600 transition-colors duration-200"
-            >
-              Done
-            </button>
-          </div>
-        </div>
-      )}
+      {/* Quick Action intentionally omitted for analytics-backed streaks */}
     </div>
   );
 };

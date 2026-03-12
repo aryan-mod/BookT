@@ -35,7 +35,7 @@ const readingProgressSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ['reading', 'completed'],
+      enum: ['wishlist', 'reading', 'completed'],
       default: 'reading',
     },
     rating: {

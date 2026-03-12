@@ -8,8 +8,11 @@ import {
   Share2,
   MoreHorizontal,
   Edit,
+  Play,
+  ExternalLink,
 } from 'lucide-react';
 import { gsap } from 'gsap';
+import { useNavigate } from 'react-router-dom';
 
 const LibraryBookCard = ({
   book,
@@ -20,9 +23,50 @@ const LibraryBookCard = ({
   onReadUploaded,
 }) => {
   const cardRef = useRef(null);
+  const navigate = useNavigate();
   const [isHovered, setIsHovered] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [currentPage, setCurrentPage] = useState(book?.currentPage || 0);
+  const [coverSrcIndex, setCoverSrcIndex] = useState(0);
+
+  const coverSources = (() => {
+    const sources = [];
+    const push = (v) => {
+      if (typeof v !== 'string') return;
+      const s = v.trim();
+      if (!s) return;
+      if (!sources.includes(s)) sources.push(s);
+    };
+
+    push(book?.thumbnail);
+    push(book?.cover);
+    push(book?.coverImage);
+
+    // Optional: support common external metadata fields if present.
+    push(book?.googleThumbnail);
+    push(book?.imageLinks?.thumbnail);
+
+    const coverId =
+      book?.openLibraryCoverId ??
+      book?.coverId ??
+      book?.cover_i ??
+      book?.coverI ??
+      null;
+    if (coverId != null && String(coverId).trim()) {
+      push(`https://covers.openlibrary.org/b/id/${String(coverId).trim()}-M.jpg`);
+    }
+
+    return sources;
+  })();
+
+  const coverSrc =
+    coverSrcIndex >= 0 && coverSrcIndex < coverSources.length
+      ? coverSources[coverSrcIndex]
+      : null;
+  const showResume =
+    book?.type === 'uploaded' && Number(book?.currentPage) > 1;
+  const showPreview =
+    typeof book?.previewLink === 'string' && book.previewLink.trim().length > 0;
 
   useEffect(() => {
     const card = cardRef.current;
@@ -98,16 +142,23 @@ const LibraryBookCard = ({
     >
       <div className="relative">
         <div className="w-full h-48 bg-gray-100 dark:bg-gray-900 overflow-hidden flex items-center justify-center">
-          {book?.thumbnail || book?.cover ? (
+          {coverSrc ? (
             <img
-              src={book.thumbnail || book.cover}
+              src={coverSrc}
               alt={book?.title || 'Book cover'}
               className="w-full h-48 object-cover transition-transform duration-300 group-hover:scale-105"
+              onError={(e) => {
+                e.currentTarget.onerror = null;
+                setCoverSrcIndex((i) => {
+                  const next = i + 1;
+                  return next < coverSources.length ? next : coverSources.length;
+                });
+              }}
             />
           ) : (
             <div className="flex flex-col items-center justify-center text-gray-400 dark:text-gray-500">
               <BookOpen className="h-8 w-8 mb-2" />
-              <span className="text-xs">No cover available</span>
+              <span className="text-xs">Cover unavailable</span>
             </div>
           )}
         </div>
@@ -256,19 +307,63 @@ const LibraryBookCard = ({
         )}
 
         {book?.type === 'uploaded' ? (
+          <div className="pt-4 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              {showResume ? (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate(`/reader/${book.id || book._id}?page=${Number(book.currentPage) || 1}`);
+                  }}
+                  className="inline-flex items-center rounded-full bg-blue-600 text-white px-4 py-1.5 text-xs font-semibold shadow-sm hover:bg-blue-700 transition-colors"
+                >
+                  <Play className="h-4 w-4 mr-1.5" />
+                  Resume Reading
+                </button>
+              ) : null}
+
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (typeof onReadUploaded === 'function') {
+                    onReadUploaded(book);
+                  }
+                }}
+                className="inline-flex items-center rounded-full bg-gray-900 text-white dark:bg-gray-700 px-4 py-1.5 text-xs font-semibold shadow-sm hover:bg-black dark:hover:bg-gray-600 transition-colors"
+              >
+                <BookOpen className="h-4 w-4 mr-1.5" />
+                Open Reader
+              </button>
+            </div>
+
+            {showPreview ? (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  window.open(book.previewLink, '_blank', 'noopener,noreferrer');
+                }}
+                className="inline-flex items-center rounded-full bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 px-3 py-1.5 text-xs font-semibold border border-gray-200 dark:border-gray-700 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+              >
+                <ExternalLink className="h-4 w-4 mr-1.5" />
+                Read Preview
+              </button>
+            ) : null}
+          </div>
+        ) : showPreview ? (
           <div className="pt-4 border-t border-gray-200 dark:border-gray-700 flex justify-end">
             <button
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
-                if (typeof onReadUploaded === 'function') {
-                  onReadUploaded(book);
-                }
+                window.open(book.previewLink, '_blank', 'noopener,noreferrer');
               }}
-              className="inline-flex items-center rounded-full bg-blue-600 text-white px-4 py-1.5 text-xs font-semibold shadow-sm hover:bg-blue-700 transition-colors"
+              className="inline-flex items-center rounded-full bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-100 px-4 py-1.5 text-xs font-semibold border border-gray-200 dark:border-gray-600 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
             >
-              <BookOpen className="h-4 w-4 mr-1.5" />
-              Read PDF
+              <ExternalLink className="h-4 w-4 mr-1.5" />
+              Read Preview
             </button>
           </div>
         ) : null}

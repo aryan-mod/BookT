@@ -2,20 +2,45 @@ import React, { useEffect, useRef } from 'react';
 import { BookOpen, Clock, Target, TrendingUp, Award, Calendar } from 'lucide-react';
 import { gsap } from 'gsap';
 
-const StatsPanel = ({ books }) => {
+const formatMinutes = (totalMinutes) => {
+  const minutes = Number.isFinite(totalMinutes) ? Math.max(0, Math.round(totalMinutes)) : 0;
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  if (hours >= 24) {
+    const days = Math.floor(hours / 24);
+    const remHours = hours % 24;
+    return remHours ? `${days}d ${remHours}h` : `${days}d`;
+  }
+  return mins ? `${hours}h ${mins}m` : `${hours}h`;
+};
+
+const StatsPanel = ({ books, analytics }) => {
   const panelRef = useRef(null);
   const statsRef = useRef(null);
 
-  const completedBooks = books.filter(book => book.status === 'completed');
-  const totalPages = completedBooks.reduce((sum, book) => sum + book.pages, 0);
-  const averageRating = completedBooks.reduce((sum, book) => sum + (book.rating || 0), 0) / completedBooks.length || 0;
-  const currentlyReading = books.filter(book => book.status === 'reading').length;
+  const completedBooksLocal = books.filter(book => book.status === 'completed');
+  const totalPagesLocal = completedBooksLocal.reduce((sum, book) => sum + (book.pages || 0), 0);
+  const averageRatingLocal =
+    completedBooksLocal.reduce((sum, book) => sum + (book.rating || 0), 0) /
+      (completedBooksLocal.length || 1) || 0;
+  const currentlyReadingLocal = books.filter(book => book.status === 'reading').length;
+
+  const totalBooksRead = analytics?.totalBooksRead ?? completedBooksLocal.length;
+  const totalPages = analytics?.pagesRead ?? totalPagesLocal;
+  const averageRating =
+    typeof analytics?.averageRating === 'number'
+      ? analytics.averageRating
+      : averageRatingLocal;
+  const currentlyReading = analytics?.currentlyReadingCount ?? currentlyReadingLocal;
+  const booksCompletedThisMonth = analytics?.booksCompletedThisMonth ?? 0;
+  const readingTimeLabel = formatMinutes(analytics?.totalReadingMinutes);
 
   const stats = [
     { 
       icon: BookOpen, 
       label: 'Books Read', 
-      value: completedBooks.length, 
+      value: totalBooksRead, 
       color: 'text-blue-500',
       bgColor: 'bg-blue-50 dark:bg-blue-900/20' 
     },
@@ -43,14 +68,14 @@ const StatsPanel = ({ books }) => {
     { 
       icon: Award, 
       label: 'This Month', 
-      value: '4', 
+      value: booksCompletedThisMonth, 
       color: 'text-orange-500',
       bgColor: 'bg-orange-50 dark:bg-orange-900/20' 
     },
     { 
       icon: Clock, 
       label: 'Reading Time', 
-      value: '24h', 
+      value: readingTimeLabel, 
       color: 'text-teal-500',
       bgColor: 'bg-teal-50 dark:bg-teal-900/20' 
     }

@@ -134,7 +134,7 @@ exports.getAllBooks = asyncHandler(async (req, res, next) => {
     };
   };
 
-  const normalizeUploaded = (doc) => {
+  const normalizeUploaded = (doc, progressDoc) => {
     if (!doc) return null;
     const id = doc._id || doc.id;
     const title =
@@ -152,6 +152,19 @@ exports.getAllBooks = asyncHandler(async (req, res, next) => {
       thumbnail: null,
       createdAt,
       type: 'uploaded',
+      currentPage:
+        progressDoc && Number.isFinite(progressDoc.currentPage)
+          ? progressDoc.currentPage
+          : undefined,
+      totalPages:
+        progressDoc && Number.isFinite(progressDoc.totalPages)
+          ? progressDoc.totalPages
+          : undefined,
+      percentage:
+        progressDoc && Number.isFinite(progressDoc.percentage)
+          ? progressDoc.percentage
+          : undefined,
+      lastReadAt: progressDoc?.lastReadAt ?? undefined,
     };
   };
 
@@ -171,9 +184,34 @@ exports.getAllBooks = asyncHandler(async (req, res, next) => {
 
   let uploaded = [];
   if (userId) {
-    const uploadedDocs = await UploadedBook.find({ user: userId }).sort('-createdAt').lean();
+    const uploadedDocs = await UploadedBook.find({ user: userId })
+      .sort('-createdAt')
+      .lean();
+
+    const uploadedIds = (Array.isArray(uploadedDocs) ? uploadedDocs : [])
+      .map((d) => d && (d._id || d.id))
+      .filter(Boolean);
+
+    const uploadedProgresses = uploadedIds.length
+      ? await require('../models').UploadedBookReadingProgress.find({
+          user: userId,
+          book: { $in: uploadedIds },
+        })
+          .select('book currentPage totalPages percentage lastReadAt updatedAt')
+          .lean()
+      : [];
+
+    const progressByBookId = new Map(
+      (Array.isArray(uploadedProgresses) ? uploadedProgresses : []).map((p) => [
+        String(p.book),
+        p,
+      ])
+    );
+
     uploaded = Array.isArray(uploadedDocs)
-      ? uploadedDocs.map((u) => normalizeUploaded(u)).filter(Boolean)
+      ? uploadedDocs
+          .map((u) => normalizeUploaded(u, progressByBookId.get(String(u._id || u.id))))
+          .filter(Boolean)
       : [];
   }
 
