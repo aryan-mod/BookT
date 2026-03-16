@@ -1,159 +1,186 @@
-import { useState, useContext } from 'react';
+import { useState, useContext, useMemo } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import { GoogleLogin } from '@react-oauth/google';
 import { AuthContext } from '../context/AuthContext';
-import { BookOpen } from 'lucide-react';
+import { BookOpen, Mail, Lock, AlertCircle, Loader2 } from 'lucide-react';
+
+// Animated background orbs
+function FloatingOrbs() {
+  const orbs = useMemo(() => [
+    { w: 300, h: 300, l: '10%',  t: '10%',  color: 'rgba(124,58,237,0.12)' },
+    { w: 200, h: 200, l: '60%',  t: '60%',  color: 'rgba(6,182,212,0.08)' },
+    { w: 150, h: 150, l: '80%',  t: '20%',  color: 'rgba(245,158,11,0.06)' },
+  ], []);
+  return (
+    <div className="absolute inset-0 overflow-hidden pointer-events-none">
+      {orbs.map((o, i) => (
+        <motion.div
+          key={i}
+          className="absolute rounded-full blur-3xl"
+          style={{ width: o.w, height: o.h, left: o.l, top: o.t, background: o.color }}
+          animate={{ scale: [1, 1.15, 1], opacity: [0.5, 0.9, 0.5] }}
+          transition={{ duration: 6 + i * 2, repeat: Infinity, ease: 'easeInOut', delay: i * 1.5 }}
+        />
+      ))}
+    </div>
+  );
+}
 
 export default function Login() {
-  const [email, setEmail] = useState('');
+  const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
-  const { login, loginWithGoogle, error, setError } = useContext(AuthContext);
-  const navigate = useNavigate();
-  const location = useLocation();
   const [submitting, setSubmitting] = useState(false);
-
+  const { login, loginWithGoogle, error, setError } = useContext(AuthContext);
+  const navigate  = useNavigate();
+  const location  = useLocation();
   const from = location.state?.from?.pathname || '/dashboard';
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSubmitting(true);
     setError(null);
-
     try {
       await login(email, password);
       navigate(from, { replace: true });
     } catch (err) {
-      const status = err.response?.status;
+      const status  = err.response?.status;
       const message = err.response?.data?.message || 'Login failed. Please try again.';
-      if (status === 403 && message?.toLowerCase().includes('banned')) {
-        setError('🚫 Your account has been banned. Please contact support.');
-      } else {
-        setError(message);
-      }
-    } finally {
-      setSubmitting(false);
-    }
+      setError(status === 403 && message?.toLowerCase().includes('banned')
+        ? '🚫 Your account has been banned. Please contact support.'
+        : message);
+    } finally { setSubmitting(false); }
   };
 
   const handleGoogleSuccess = async (credentialResponse) => {
     const credential = credentialResponse?.credential;
-    if (!credential) {
-      setError('Google login failed. Please try again.');
-      return;
-    }
-
-    setSubmitting(true);
-    setError(null);
-
+    if (!credential) { setError('Google login failed. Please try again.'); return; }
+    setSubmitting(true); setError(null);
     try {
       await loginWithGoogle(credential);
       navigate(from, { replace: true });
     } catch (err) {
-      const status = err.response?.status;
-      const message =
-        err.response?.data?.message ||
-        'Google login failed. Please try again.';
-      if (status === 403 && message?.toLowerCase().includes('banned')) {
-        setError('🚫 Your account has been banned. Please contact support.');
-      } else {
-        setError(message);
-      }
-    } finally {
-      setSubmitting(false);
-    }
+      const status  = err.response?.status;
+      const message = err.response?.data?.message || 'Google login failed.';
+      setError(status === 403 && message?.toLowerCase().includes('banned') ? '🚫 Account banned.' : message);
+    } finally { setSubmitting(false); }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-blue-50 dark:from-gray-900 dark:to-blue-900 px-4">
-      <div className="w-full max-w-md">
+    <div className="min-h-screen bg-nx-gradient flex items-center justify-center px-4 py-12 relative overflow-hidden">
+      <FloatingOrbs />
+
+      {/* Grid texture */}
+      <div className="absolute inset-0 opacity-[0.02] pointer-events-none"
+        style={{ backgroundImage: 'linear-gradient(rgba(255,255,255,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.5) 1px, transparent 1px)', backgroundSize: '40px 40px' }} />
+
+      <motion.div
+        initial={{ opacity: 0, y: 24 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.55 }}
+        className="w-full max-w-md relative z-10"
+      >
+        {/* Logo */}
         <div className="flex justify-center mb-8">
-          <div className="flex items-center space-x-2">
-            <BookOpen className="h-10 w-10 text-blue-600 dark:text-blue-400" />
-            <span className="text-2xl font-bold text-gray-900 dark:text-white">BookTracker</span>
-          </div>
+          <Link to="/" className="flex items-center gap-2.5 group">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-violet-600 to-cyan-500 flex items-center justify-center shadow-[0_0_20px_rgba(124,58,237,0.4)] group-hover:shadow-[0_0_30px_rgba(124,58,237,0.6)] transition-shadow">
+              <BookOpen className="w-5 h-5 text-white" />
+            </div>
+            <span className="text-xl font-bold text-white tracking-tight">
+              Nexus<span className="text-violet-400">Read</span>
+            </span>
+          </Link>
         </div>
 
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8 border border-gray-200 dark:border-gray-700">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">Sign in</h1>
+        {/* Card */}
+        <div className="glass-card-static p-8 shadow-2xl shadow-black/50">
+          <div className="mb-7">
+            <h1 className="text-2xl font-extrabold text-white mb-1">Welcome back</h1>
+            <p className="text-slate-500 text-sm">Sign in to your reading universe</p>
+          </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Email */}
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Email
-              </label>
-              <input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                autoComplete="email"
-                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="you@example.com"
-              />
+              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Email</label>
+              <div className="relative">
+                <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-600" />
+                <input
+                  id="email" type="email" value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  required autoComplete="email"
+                  placeholder="you@example.com"
+                  className="nx-input pl-10"
+                />
+              </div>
             </div>
 
+            {/* Password */}
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Password
-              </label>
-              <input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                autoComplete="current-password"
-                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="••••••••"
-              />
+              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Password</label>
+              <div className="relative">
+                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-600" />
+                <input
+                  id="password" type="password" value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  required autoComplete="current-password"
+                  placeholder="••••••••"
+                  className="nx-input pl-10"
+                />
+              </div>
             </div>
 
-            <button
-              type="submit"
-              disabled={submitting}
-              className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-medium rounded-lg transition-colors"
+            {/* Error */}
+            {error && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.96 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="flex items-start gap-2.5 p-3 rounded-xl bg-red-500/10 border border-red-500/25 text-red-300 text-sm"
+              >
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                {error}
+              </motion.div>
+            )}
+
+            {/* Submit */}
+            <button type="submit" disabled={submitting}
+              className="w-full py-3 rounded-xl bg-gradient-to-r from-violet-600 to-violet-700 hover:from-violet-500 hover:to-violet-600 text-white font-semibold text-sm transition-all shadow-[0_0_20px_rgba(124,58,237,0.3)] hover:shadow-[0_0_30px_rgba(124,58,237,0.5)] disabled:opacity-60 disabled:cursor-wait flex items-center justify-center gap-2"
             >
-              {submitting ? 'Signing in...' : 'Sign in'}
+              {submitting ? <><Loader2 className="w-4 h-4 animate-spin" />Signing in…</> : 'Sign In'}
             </button>
           </form>
 
-          <div className="mt-6">
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-200 dark:border-gray-700" />
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="px-2 bg-white dark:bg-gray-800 text-gray-500">
-                  Or continue with
-                </span>
-              </div>
+          {/* Divider */}
+          <div className="relative my-5">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
             </div>
-            <div className="mt-4 flex justify-center">
-              <GoogleLogin
-                onSuccess={handleGoogleSuccess}
-                onError={() =>
-                  setError('Google login failed. Please try again.')
-                }
-                useOneTap={false}
-              />
+            <div className="relative flex justify-center">
+              <span className="px-3 text-xs text-slate-600 bg-[#12122a]">or continue with</span>
             </div>
           </div>
 
-          {error && (
-            <div className="mt-4 p-3 rounded-lg bg-red-500/10 border border-red-500 text-red-400 text-sm text-center animate-pulse">
-              {error}
-            </div>
-          )}
+          {/* Google */}
+          <div className="flex justify-center">
+            <GoogleLogin
+              onSuccess={handleGoogleSuccess}
+              onError={() => setError('Google login failed. Please try again.')}
+              useOneTap={false}
+              theme="filled_black"
+              shape="pill"
+              size="large"
+            />
+          </div>
 
-          <p className="mt-6 text-center text-gray-600 dark:text-gray-400 text-sm">
-            Don&apos;t have an account?{' '}
-            <Link to="/register" className="text-blue-600 dark:text-blue-400 font-medium hover:underline">
-              Sign up
+          {/* Footer */}
+          <p className="mt-6 text-center text-slate-600 text-sm">
+            Don't have an account?{' '}
+            <Link to="/register" className="text-violet-400 hover:text-violet-300 font-semibold transition-colors">
+              Sign up free
             </Link>
           </p>
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 }

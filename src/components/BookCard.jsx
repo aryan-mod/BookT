@@ -1,172 +1,156 @@
 import React, { memo, useState } from 'react';
-import { BookOpen, Plus, Check, Loader2, ExternalLink } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { BookOpen, Plus, Check, Loader2, ExternalLink, Star } from 'lucide-react';
 import api from '../api/axios';
 
 function formatAuthors(authors) {
   if (!Array.isArray(authors) || authors.length === 0) return '';
-  return authors.join(', ');
+  return authors.length > 2 ? `${authors[0]}, ${authors[1]} +${authors.length - 2}` : authors.join(', ');
 }
 
-function safeText(value) {
-  return typeof value === 'string' ? value : '';
-}
+function safeText(v) { return typeof v === 'string' ? v : ''; }
 
 function getBookKey(book) {
-  const id = safeText(book?.id);
-  const source = safeText(book?.source);
-  return `${source}:${id}`;
+  return `${safeText(book?.source)}:${safeText(book?.id)}`;
 }
 
-function BookCard({
-  book,
-  onAdd,
-  isAdded = false,
-  isAdding = false,
-}) {
-  const title = safeText(book?.title) || 'Untitled';
-  const authors = formatAuthors(book?.authors);
+function StarRating({ rating }) {
+  const r = Math.round(Math.max(0, Math.min(5, rating || 0)));
+  return (
+    <div className="flex gap-0.5">
+      {[1,2,3,4,5].map(s => (
+        <Star key={s} className={`w-3 h-3 ${s <= r ? 'text-amber-400 fill-amber-400' : 'text-slate-700'}`} />
+      ))}
+    </div>
+  );
+}
+
+function BookCard({ book, onAdd, isAdded = false, isAdding = false }) {
+  const title       = safeText(book?.title) || 'Untitled';
+  const authors     = formatAuthors(book?.authors);
   const description = safeText(book?.description);
-  const thumbnail = safeText(book?.thumbnail);
-  const pageCount =
-    typeof book?.pageCount === 'number' && Number.isFinite(book.pageCount) ? book.pageCount : null;
+  const thumbnail   = safeText(book?.thumbnail);
+  const pageCount   = typeof book?.pageCount === 'number' && Number.isFinite(book.pageCount) ? book.pageCount : null;
   const publishedDate = safeText(book?.publishedDate);
-  const source = safeText(book?.source);
+  const source      = safeText(book?.source);
+  const previewLink = typeof book?.previewLink === 'string' && book.previewLink.trim() ? book.previewLink : null;
+  const canAdd      = !isAdded && !isAdding && typeof onAdd === 'function';
+  const sourceLabel = source === 'open-library' ? 'Open Library' : source === 'google' ? 'Google Books' : '';
+  const rating      = book?.averageRating || 0;
 
   const [isOpening, setIsOpening] = useState(false);
-  const previewLink = typeof book?.previewLink === 'string' && book.previewLink.trim() ? book.previewLink : null;
-  const canAdd = !isAdded && !isAdding && typeof onAdd === 'function';
-  const showMeta = Boolean(publishedDate || pageCount || source);
-  const showPreview =
-    previewLink &&
-    (source === 'google' || source === 'open-library');
 
   const handlePreviewClick = () => {
     if (!previewLink || isOpening) return;
     setIsOpening(true);
     api.post('/books/preview-click', { externalId: book?.id, source }).catch(() => {});
     window.open(previewLink, '_blank', 'noopener,noreferrer');
-    setTimeout(() => setIsOpening(false), 0);
+    setTimeout(() => setIsOpening(false), 500);
   };
 
-  const sourceLabel =
-    source === 'open-library' ? 'Open Library' : source === 'google' ? 'Google' : '';
-  const sourceClasses =
-    source === 'open-library'
-      ? 'bg-emerald-600/90 text-white dark:bg-emerald-500/90'
-      : source === 'google'
-      ? 'bg-blue-600/90 text-white dark:bg-blue-500/90'
-      : 'bg-gray-800/80 text-white';
-
   return (
-    <div className="group flex flex-col justify-between h-full rounded-2xl bg-white dark:bg-gray-800 shadow-sm border border-gray-100 dark:border-gray-700/60 overflow-hidden transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5">
-      <div className="flex flex-col flex-1 min-h-0">
-        <div className="relative overflow-hidden rounded-t-2xl">
-          <div className="h-60 w-full overflow-hidden bg-gray-100 dark:bg-gray-700">
-            {thumbnail ? (
-              <img
-                src={thumbnail}
-                alt={title}
-                className="h-60 w-full object-cover rounded-lg"
-                loading="lazy"
-                decoding="async"
-                referrerPolicy="no-referrer"
-              />
-            ) : (
-              <div className="h-60 w-full grid place-items-center">
-                <div className="flex flex-col items-center gap-2 text-gray-500 dark:text-gray-300">
-                  <BookOpen className="h-10 w-10" />
-                  <span className="text-xs font-medium">No cover</span>
-                </div>
-              </div>
-            )}
+    <motion.div
+      layout
+      className="book-card-explore h-full flex flex-col"
+      whileHover={{ y: -4 }}
+      transition={{ duration: 0.25 }}
+    >
+      {/* Cover */}
+      <div className="relative overflow-hidden flex-shrink-0" style={{ aspectRatio: '2/3' }}>
+        {thumbnail ? (
+          <img
+            src={thumbnail}
+            alt={title}
+            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+            loading="lazy"
+            decoding="async"
+            referrerPolicy="no-referrer"
+          />
+        ) : (
+          <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-violet-900/40 to-slate-900/80 gap-2">
+            <BookOpen className="w-10 h-10 text-violet-600/50" />
+            <span className="text-xs text-slate-700">No cover</span>
           </div>
-          {sourceLabel ? (
-            <div className="absolute right-3 top-3">
-              <span
-                className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold shadow-sm backdrop-blur ${sourceClasses}`}
-              >
-                {sourceLabel}
-              </span>
-            </div>
-          ) : null}
-        </div>
+        )}
 
-        <div className="p-4 flex flex-col flex-1 min-h-0">
-          <div className="space-y-1">
-            <h3 className="text-base font-semibold text-gray-900 dark:text-white line-clamp-2">
-              {title}
-            </h3>
-            {authors ? (
-              <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-1">
-                {authors}
-              </p>
-            ) : null}
+        {/* Gradient overlay at bottom */}
+        <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/70 to-transparent pointer-events-none" />
+
+        {/* Source badge */}
+        {sourceLabel && (
+          <div className="absolute top-2 left-2">
+            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold backdrop-blur-md border ${
+              source === 'google'
+                ? 'bg-blue-500/30 border-blue-500/40 text-blue-300'
+                : 'bg-emerald-500/30 border-emerald-500/40 text-emerald-300'
+            }`}>
+              {sourceLabel}
+            </span>
           </div>
+        )}
 
-          {description ? (
-            <p className="mt-3 text-xs text-gray-600 dark:text-gray-400 line-clamp-2">
-              {description}
-            </p>
-          ) : (
-            <p className="mt-3 text-xs text-gray-500 dark:text-gray-500 italic">
-              No description available.
-            </p>
-          )}
-
-          {showMeta ? (
-            <div className="mt-4 flex flex-wrap gap-1.5">
-              {publishedDate ? (
-                <span className="inline-flex rounded-full bg-gray-100 dark:bg-gray-700/60 px-2 py-0.5 text-[11px] text-gray-600 dark:text-gray-400">
-                  {publishedDate}
-                </span>
-              ) : null}
-              {pageCount !== null ? (
-                <span className="inline-flex rounded-full bg-gray-100 dark:bg-gray-700/60 px-2 py-0.5 text-[11px] text-gray-600 dark:text-gray-400">
-                  {pageCount} p
-                </span>
-              ) : null}
-            </div>
-          ) : null}
-        </div>
+        {/* Page count badge */}
+        {pageCount !== null && (
+          <div className="absolute bottom-2 right-2">
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-black/60 border border-white/10 text-slate-400 backdrop-blur-sm">
+              {pageCount} pp
+            </span>
+          </div>
+        )}
       </div>
 
-      <div className="p-4 pt-0 space-y-2">
-        <button
-          type="button"
-          onClick={() => (canAdd ? onAdd(book, getBookKey(book)) : undefined)}
-          disabled={!canAdd}
-          className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 text-white px-4 py-2.5 text-sm font-semibold hover:from-blue-700 hover:to-blue-800 disabled:from-gray-200 disabled:to-gray-200 disabled:text-gray-600 dark:disabled:from-gray-700 dark:disabled:to-gray-700 dark:disabled:text-gray-300 disabled:cursor-not-allowed transition-all"
-        >
-          {isAdded ? (
-            <>
-              <Check className="h-4 w-4" />
-              Added
-            </>
-          ) : isAdding ? (
-            <>
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Adding…
-            </>
-          ) : (
-            <>
-              <Plus className="h-4 w-4" />
-              Add to Library
-            </>
-          )}
-        </button>
-        {showPreview ? (
+      {/* Content */}
+      <div className="relative z-10 p-4 flex flex-col flex-1 gap-2.5">
+        <div>
+          <h3 className="text-sm font-semibold text-white line-clamp-2 leading-snug">{title}</h3>
+          {authors && <p className="text-xs text-slate-500 mt-0.5 line-clamp-1">{authors}</p>}
+        </div>
+
+        {rating > 0 && <StarRating rating={rating} />}
+
+        {description && (
+          <p className="text-xs text-slate-600 line-clamp-2 leading-relaxed">{description}</p>
+        )}
+
+        {publishedDate && (
+          <span className="text-[10px] text-slate-700">{publishedDate}</span>
+        )}
+
+        {/* Actions */}
+        <div className="mt-auto pt-2 space-y-2">
           <button
             type="button"
-            onClick={handlePreviewClick}
-            disabled={isOpening}
-            className="w-full inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-700/60 hover:bg-gray-200 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-600 transition-all duration-200 cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
+            onClick={() => canAdd && onAdd(book, getBookKey(book))}
+            disabled={!canAdd}
+            className={`
+              w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold transition-all duration-200
+              ${isAdded
+                ? 'bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 cursor-default'
+                : isAdding
+                  ? 'bg-violet-600/30 border border-violet-500/30 text-violet-300 cursor-wait'
+                  : 'bg-violet-600 hover:bg-violet-500 text-white shadow-[0_0_12px_rgba(124,58,237,0.3)] hover:shadow-[0_0_20px_rgba(124,58,237,0.5)] active:scale-95'
+              }
+            `}
           >
-            <ExternalLink className="h-3 w-3 shrink-0" />
-            {source === 'google' ? 'Read Preview' : 'View on Open Library'}
+            {isAdded  ? <><Check className="w-3.5 h-3.5" /> In Library</> :
+             isAdding ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Adding…</> :
+                        <><Plus className="w-3.5 h-3.5" /> Add to Library</>}
           </button>
-        ) : null}
+
+          {previewLink && (source === 'google' || source === 'open-library') && (
+            <button
+              type="button"
+              onClick={handlePreviewClick}
+              disabled={isOpening}
+              className="w-full flex items-center justify-center gap-2 px-3 py-1.5 rounded-xl text-xs font-medium text-slate-500 hover:text-slate-300 bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] transition-all"
+            >
+              <ExternalLink className="w-3 h-3" />
+              {source === 'google' ? 'Preview on Google' : 'View on Open Library'}
+            </button>
+          )}
+        </div>
       </div>
-    </div>
+    </motion.div>
   );
 }
 

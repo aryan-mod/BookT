@@ -11,6 +11,9 @@ const Note = require('./Note');
 const Highlight = require('./Highlight');
 const ReadingSession = require('./ReadingSession');
 const Goal = require('./Goal');
+const Order = require('./Order');
+const Review = require('./Review');
+const Notification = require('./Notification');
 
 module.exports = {
   User,
@@ -26,4 +29,8 @@ module.exports = {
   Highlight,
   ReadingSession,
   Goal,
+  Order,
+  Review,
+  Notification,
 };
+

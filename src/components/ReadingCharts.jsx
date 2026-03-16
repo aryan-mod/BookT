@@ -1,124 +1,99 @@
-import React from 'react';
-import {
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  CartesianGrid,
-  Legend,
-  LineChart,
-  Line,
-} from 'recharts';
+import React, { useMemo } from 'react';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
+import { TrendingUp } from 'lucide-react';
 
-const monthLabel = (item) => {
-  if (!item) return '';
-  const date = new Date(item.year, item.month - 1, 1);
-  return date.toLocaleString(undefined, { month: 'short' });
-};
+const MONTH_ABBR = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
-const ReadingCharts = ({ monthlyActivity }) => {
-  const data = Array.isArray(monthlyActivity) ? monthlyActivity : [];
-
+function CustomTooltip({ active, payload, label }) {
+  if (!active || !payload?.length) return null;
   return (
-    <div className="bg-white dark:bg-gray-900 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-800 h-full flex flex-col space-y-6">
-      <div>
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">
-          Monthly Reading Activity
-        </h3>
-        <p className="text-xs text-gray-500 dark:text-gray-400">
-          Books completed and pages read over the last 12 months.
+    <div className="glass px-3 py-2 rounded-xl shadow-2xl border border-violet-500/20">
+      <p className="text-xs text-slate-400 mb-1">{label}</p>
+      {payload.map((p, i) => (
+        <p key={i} className="text-sm font-bold" style={{ color: p.color || '#a78bfa' }}>
+          {p.value} {p.name === 'pages' ? 'pages' : 'books'}
         </p>
-      </div>
-
-      <div className="h-56">
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={data}>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} strokeOpacity={0.1} />
-            <XAxis
-              dataKey={monthLabel}
-              stroke="#9ca3af"
-              fontSize={12}
-              tickLine={false}
-              axisLine={false}
-            />
-            <YAxis
-              stroke="#9ca3af"
-              fontSize={11}
-              tickLine={false}
-              axisLine={false}
-            />
-            <Tooltip
-              contentStyle={{
-                backgroundColor: '#111827',
-                borderRadius: '0.75rem',
-                border: '1px solid #374151',
-                color: '#e5e7eb',
-                fontSize: '0.75rem',
-              }}
-            />
-            <Legend verticalAlign="top" height={24} iconSize={8} />
-            <Bar
-              dataKey="booksCompleted"
-              name="Books"
-              fill="#3b82f6"
-              radius={[6, 6, 0, 0]}
-            />
-            <Bar
-              dataKey="pagesRead"
-              name="Pages"
-              fill="#10b981"
-              radius={[6, 6, 0, 0]}
-            />
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
-
-      <div className="h-44">
-        <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">
-          Reading Time Trend
-        </h4>
-        <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={data}>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} strokeOpacity={0.1} />
-            <XAxis
-              dataKey={monthLabel}
-              stroke="#9ca3af"
-              fontSize={12}
-              tickLine={false}
-              axisLine={false}
-            />
-            <YAxis
-              stroke="#9ca3af"
-              fontSize={11}
-              tickLine={false}
-              axisLine={false}
-            />
-            <Tooltip
-              contentStyle={{
-                backgroundColor: '#111827',
-                borderRadius: '0.75rem',
-                border: '1px solid #374151',
-                color: '#e5e7eb',
-                fontSize: '0.75rem',
-              }}
-            />
-            <Line
-              type="monotone"
-              dataKey="minutesRead"
-              name="Minutes read"
-              stroke="#8b5cf6"
-              strokeWidth={2}
-              dot={false}
-              activeDot={{ r: 4 }}
-            />
-          </LineChart>
-        </ResponsiveContainer>
-      </div>
+      ))}
     </div>
   );
-};
+}
 
-export default ReadingCharts;
+export default function ReadingCharts({ monthlyActivity = [] }) {
+  const data = useMemo(() => {
+    if (!Array.isArray(monthlyActivity) || monthlyActivity.length === 0) {
+      return MONTH_ABBR.map((m) => ({ month: m, pages: 0, books: 0 }));
+    }
+    return monthlyActivity.map((item) => ({
+      month: MONTH_ABBR[(item.month ?? item._id?.month ?? 1) - 1] || '?',
+      pages: item.pagesRead || item.pages || 0,
+      books: item.booksCompleted || item.books || 0,
+    }));
+  }, [monthlyActivity]);
 
+  const hasData = data.some(d => d.pages > 0 || d.books > 0);
+
+  return (
+    <div className="glass-card p-5">
+      <div className="flex items-center gap-2 mb-5">
+        <div className="p-2 rounded-xl bg-violet-500/20">
+          <TrendingUp className="w-4 h-4 text-violet-400" />
+        </div>
+        <h3 className="font-bold text-white text-sm">Reading Activity</h3>
+        <span className="ml-auto text-xs text-slate-500">12 months</span>
+      </div>
+
+      {!hasData ? (
+        <div className="h-40 flex items-center justify-center text-slate-600 text-sm">
+          No reading data yet. Start reading to see your stats!
+        </div>
+      ) : (
+        <>
+          {/* Area chart for pages */}
+          <div className="mb-1">
+            <p className="text-xs text-slate-500 font-semibold mb-3">PAGES READ</p>
+            <ResponsiveContainer width="100%" height={120}>
+              <AreaChart data={data} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="violetGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%"  stopColor="#7c3aed" stopOpacity={0.6} />
+                    <stop offset="95%" stopColor="#7c3aed" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
+                <XAxis dataKey="month" tick={{ fill: '#475569', fontSize: 10 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: '#475569', fontSize: 10 }} axisLine={false} tickLine={false} />
+                <Tooltip content={<CustomTooltip />} />
+                <Area
+                  type="monotone" dataKey="pages" name="pages"
+                  stroke="#7c3aed" strokeWidth={2.5}
+                  fill="url(#violetGrad)"
+                  dot={false} activeDot={{ r: 5, fill: '#a78bfa', stroke: '#7c3aed', strokeWidth: 2 }}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Bar chart for books */}
+          <div className="mt-4">
+            <p className="text-xs text-slate-500 font-semibold mb-3">BOOKS COMPLETED</p>
+            <ResponsiveContainer width="100%" height={80}>
+              <BarChart data={data} margin={{ top: 0, right: 4, left: -20, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
+                <XAxis dataKey="month" tick={{ fill: '#475569', fontSize: 10 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: '#475569', fontSize: 9 }} axisLine={false} tickLine={false} />
+                <Tooltip content={<CustomTooltip />} />
+                <Bar dataKey="books" name="books" fill="url(#cyanGrad)" radius={[4, 4, 0, 0]} maxBarSize={20} />
+                <defs>
+                  <linearGradient id="cyanGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%"  stopColor="#06b6d4" stopOpacity={0.9} />
+                    <stop offset="100%" stopColor="#06b6d4" stopOpacity={0.3} />
+                  </linearGradient>
+                </defs>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}

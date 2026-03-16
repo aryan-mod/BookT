@@ -4,6 +4,13 @@ const bookRoutes = require('./book.routes');
 const bookRequestRoutes = require('./bookRequestRoutes');
 const adminRoutes = require('./adminRoutes');
 const readerRoutes = require('./reader.routes');
+const marketplaceRoutes = require('./marketplace.routes');
+const aiRoutes = require('./ai.routes');
+const orderRoutes = require('./order.routes');
+const reviewRoutes = require('./review.routes');
+const gamificationRoutes = require('./gamification.routes');
+const socialRoutes = require('./social.routes');
+const notificationRoutes = require('./notification.routes');
 
 const router = express.Router();
 
@@ -12,6 +19,13 @@ router.use('/books', bookRoutes);
 router.use('/book-requests', bookRequestRoutes);
 router.use('/admin', adminRoutes);
 router.use('/reader', readerRoutes);
+router.use('/marketplace', marketplaceRoutes);
+router.use('/ai', aiRoutes);
+router.use('/orders', orderRoutes);
+router.use('/reviews', reviewRoutes);
+router.use('/gamification', gamificationRoutes);
+router.use('/social', socialRoutes);
+router.use('/notifications', notificationRoutes);
 
 /**
  * Lightweight health/debug endpoint.

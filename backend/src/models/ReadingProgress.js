@@ -2,7 +2,28 @@ const mongoose = require('mongoose');
 
 /**
  * User-specific reading progress. One document per user per book.
+ * Extended with reader annotations: bookmarks, highlights, notes.
  */
+const bookmarkSchema = new mongoose.Schema({
+  page: { type: Number, required: true },
+  label: { type: String, default: '' },
+  createdAt: { type: Date, default: Date.now },
+});
+
+const highlightSchema = new mongoose.Schema({
+  text: { type: String, required: true },
+  page: { type: Number, required: true },
+  color: { type: String, default: '#FBBF24' },
+  note: { type: String, default: '' },
+  createdAt: { type: Date, default: Date.now },
+});
+
+const noteSchema = new mongoose.Schema({
+  content: { type: String, required: true },
+  page: { type: Number, default: 0 },
+  createdAt: { type: Date, default: Date.now },
+});
+
 const readingProgressSchema = new mongoose.Schema(
   {
     user: {
@@ -62,6 +83,11 @@ const readingProgressSchema = new mongoose.Schema(
       type: Date,
       default: Date.now,
     },
+
+    // ── Reader annotations ─────────────────────────────────────────────────
+    bookmarks: { type: [bookmarkSchema], default: [] },
+    userHighlights: { type: [highlightSchema], default: [] },
+    notes: { type: [noteSchema], default: [] },
   },
   {
     timestamps: true,

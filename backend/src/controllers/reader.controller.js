@@ -1,5 +1,7 @@
 const mongoose = require('mongoose');
 const { Readable } = require('stream');
+const path = require('path');
+const fs = require('fs/promises');
 const cloudinary = require('../../config/cloudinary');
 const UploadedBook = require('../models/UploadedBook');
 const UploadedBookReadingProgress = require('../models/UploadedBookReadingProgress');
@@ -16,6 +18,35 @@ const uploadPdf = catchAsync(async (req, res, next) => {
   const title = typeof req.body?.title === 'string' ? req.body.title.trim() : '';
   if (!title) {
     return next(new AppError('Title is required.', 400));
+  }
+
+  // Default to local storage so PDFs can be served inline via express.static
+  // (Cloudinary "raw" URLs often trigger downloads due to response headers).
+  const useCloudinary = String(process.env.USE_CLOUDINARY_PDF || '').toLowerCase() === 'true';
+
+  if (!useCloudinary) {
+    const newId = new mongoose.Types.ObjectId();
+    const fileName = `${newId}.pdf`;
+    const pdfDir = path.join(__dirname, '..', '..', 'public', 'pdfs');
+    await fs.mkdir(pdfDir, { recursive: true });
+    await fs.writeFile(path.join(pdfDir, fileName), req.file.buffer);
+
+    const fileUrl = `${req.protocol}://${req.get('host')}/api/v1/pdfs/${fileName}`;
+
+    const uploadedBook = await UploadedBook.create({
+      _id: newId,
+      user: req.user._id,
+      title,
+      fileUrl,
+      publicId: fileName,
+      fileSize: req.file.size,
+      mimeType: req.file.mimetype,
+    });
+
+    return sendSuccess(res, {
+      data: uploadedBook,
+      statusCode: 201,
+    });
   }
 
   const uploadOptions = {

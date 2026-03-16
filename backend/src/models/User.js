@@ -35,11 +35,35 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+
+    // ── Profile ────────────────────────────────────────────────────────────
+    avatar: { type: String, default: '' },
+    bio: { type: String, default: '', maxlength: 300 },
+    isPublic: { type: Boolean, default: true },
+
+    // ── Marketplace ────────────────────────────────────────────────────────
+    purchasedBooks: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Book',
+      },
+    ],
+
+    // ── Gamification ───────────────────────────────────────────────────────
+    badges: [{ type: String }],
+    coins: { type: Number, default: 0, min: 0 },
+
+    // ── Social ─────────────────────────────────────────────────────────────
+    following: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+    followers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
   },
   {
     timestamps: true,
   }
 );
+
+userSchema.index({ name: 'text' });
+userSchema.index({ coins: -1 });
 
 userSchema.pre('save', async function (next) {
   if (!this.isModified('password')) return next();

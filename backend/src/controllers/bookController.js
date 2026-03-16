@@ -232,21 +232,53 @@ exports.getAllBooks = asyncHandler(async (req, res, next) => {
  * Returns book by id. If user is logged in, includes their progress.
  */
 exports.getBook = catchAsync(async (req, res, next) => {
-  const book = await Book.findById(req.params.id);
-  if (!book) {
-    return next(new AppError('Book not found.', 404));
-  }
-  let progress = null;
-  if (req.user) {
-    progress = await ReadingProgress.findOne({
-      user: req.user._id,
-      book: req.params.id,
+  const { id } = req.params;
+
+  // 1) Try global/external Book first.
+  const book = await Book.findById(id);
+  if (book) {
+    let progress = null;
+    if (req.user) {
+      progress = await ReadingProgress.findOne({
+        user: req.user._id,
+        book: id,
+      });
+    }
+    const data = mergeBookWithProgress(book, progress);
+    return res.status(200).json({
+      status: 'success',
+      data: { book: data },
     });
   }
-  const data = mergeBookWithProgress(book, progress);
-  res.status(200).json({
+
+  // 2) Fallback: Uploaded PDF books live in UploadedBook and are user-owned.
+  // This keeps the existing API shape intact for the reader page, without changing routes.
+  if (!req.user?._id) {
+    return next(new AppError('Book not found.', 404));
+  }
+
+  const uploaded = await UploadedBook.findById(id);
+  if (!uploaded) {
+    return next(new AppError('Book not found.', 404));
+  }
+  if (String(uploaded.user) !== String(req.user._id)) {
+    return next(new AppError('You do not have access to this book.', 403));
+  }
+
+  // Normalize to the same "book" envelope used by the frontend.
+  const uploadedObj = uploaded.toObject ? uploaded.toObject() : { ...uploaded };
+  const normalizedUploaded = {
+    ...uploadedObj,
+    id: uploadedObj._id || uploadedObj.id,
+    pages: uploadedObj.totalPages ?? uploadedObj.pages ?? 0,
+    pdfUrl: uploadedObj.fileUrl,
+    fileUrl: uploadedObj.fileUrl,
+    type: 'uploaded',
+  };
+
+  return res.status(200).json({
     status: 'success',
-    data: { book: data },
+    data: { book: normalizedUploaded },
   });
 });
 

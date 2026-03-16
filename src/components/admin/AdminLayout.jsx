@@ -1,29 +1,39 @@
-import { useState, useEffect, useContext } from 'react';
-import { Outlet } from 'react-router-dom';
-import { AuthContext } from '../../context/AuthContext';
+import { useState } from 'react';
+import { Outlet, useLocation } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import AdminSidebar from './AdminSidebar';
-import AdminHeader from './AdminHeader';
+
+const pageVariants = {
+  initial: { opacity: 0, y: 10 },
+  animate: { opacity: 1, y: 0, transition: { duration: 0.28 } },
+  exit:    { opacity: 0,     transition: { duration: 0.18 } },
+};
 
 export default function AdminLayout() {
-  const { user, logout } = useContext(AuthContext);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-
-  useEffect(() => {
-    document.documentElement.classList.add('dark');
-    return () => document.documentElement.classList.remove('dark');
-  }, []);
+  const [collapsed, setCollapsed] = useState(false);
+  const location = useLocation();
+  const sidebarW = collapsed ? 72 : 240;
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
-      <AdminSidebar collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed((c) => !c)} />
+    <div className="min-h-screen bg-nx-gradient flex">
+      <AdminSidebar collapsed={collapsed} onToggle={() => setCollapsed(c => !c)} />
+
       <div
-        className="transition-[margin] duration-200"
-        style={{ marginLeft: sidebarCollapsed ? 72 : 240 }}
+        className="flex flex-col flex-1 min-h-screen transition-all duration-300"
+        style={{ marginLeft: sidebarW }}
       >
-        <AdminHeader user={user} onLogout={logout} />
-        <main className="p-6">
-          <Outlet />
-        </main>
+        <AnimatePresence mode="wait">
+          <motion.main
+            key={location.pathname}
+            variants={pageVariants}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+            className="flex-1 p-5 sm:p-7"
+          >
+            <Outlet />
+          </motion.main>
+        </AnimatePresence>
       </div>
     </div>
   );

@@ -1,422 +1,267 @@
 import React, { useEffect, useRef, useState } from 'react';
-import {
-  Star,
-  Clock,
-  BookOpen,
-  Heart,
-  MessageCircle,
-  Share2,
-  MoreHorizontal,
-  Edit,
-  Play,
-  ExternalLink,
-} from 'lucide-react';
-import { gsap } from 'gsap';
+import { Star, Clock, BookOpen, MoreHorizontal, Edit, Play, ExternalLink, Zap } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
-const LibraryBookCard = ({
-  book,
-  onBookClick,
-  onBookEdit,
-  onReactionClick,
-  onProgressUpdate,
-  onReadUploaded,
-}) => {
+const STATUS_STYLES = {
+  reading:   'status-reading',
+  completed: 'status-completed',
+  wishlist:  'status-wishlist',
+};
+
+const STATUS_DOT = {
+  reading: 'bg-cyan-400 animate-pulse',
+  completed: 'bg-emerald-400',
+  wishlist: 'bg-amber-400',
+};
+
+const GENRE_COLORS = ['from-violet-500/20 to-violet-600/10', 'from-cyan-500/20 to-cyan-600/10', 'from-amber-500/20 to-amber-600/10', 'from-emerald-500/20 to-emerald-600/10', 'from-pink-500/20 to-pink-600/10'];
+
+const LibraryBookCard = ({ book, onBookClick, onBookEdit, onReactionClick, onProgressUpdate, onReadUploaded }) => {
   const cardRef = useRef(null);
   const navigate = useNavigate();
   const [isHovered, setIsHovered] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [currentPage, setCurrentPage] = useState(book?.currentPage || 0);
   const [coverSrcIndex, setCoverSrcIndex] = useState(0);
+  const [tilt, setTilt] = useState({ x: 0, y: 0 });
+  const [glowPos, setGlowPos] = useState({ x: 50, y: 50 });
 
   const coverSources = (() => {
     const sources = [];
-    const push = (v) => {
-      if (typeof v !== 'string') return;
-      const s = v.trim();
-      if (!s) return;
-      if (!sources.includes(s)) sources.push(s);
-    };
-
-    push(book?.thumbnail);
-    push(book?.cover);
-    push(book?.coverImage);
-
-    // Optional: support common external metadata fields if present.
-    push(book?.googleThumbnail);
-    push(book?.imageLinks?.thumbnail);
-
-    const coverId =
-      book?.openLibraryCoverId ??
-      book?.coverId ??
-      book?.cover_i ??
-      book?.coverI ??
-      null;
-    if (coverId != null && String(coverId).trim()) {
-      push(`https://covers.openlibrary.org/b/id/${String(coverId).trim()}-M.jpg`);
-    }
-
+    const push = (v) => { if (typeof v === 'string' && v.trim() && !sources.includes(v.trim())) sources.push(v.trim()); };
+    push(book?.thumbnail); push(book?.cover); push(book?.coverImage);
+    push(book?.googleThumbnail); push(book?.imageLinks?.thumbnail);
+    const coverId = book?.openLibraryCoverId ?? book?.coverId ?? book?.cover_i ?? null;
+    if (coverId != null) push(`https://covers.openlibrary.org/b/id/${String(coverId).trim()}-M.jpg`);
     return sources;
   })();
 
-  const coverSrc =
-    coverSrcIndex >= 0 && coverSrcIndex < coverSources.length
-      ? coverSources[coverSrcIndex]
-      : null;
-  const showResume =
-    book?.type === 'uploaded' && Number(book?.currentPage) > 1;
-  const showPreview =
-    typeof book?.previewLink === 'string' && book.previewLink.trim().length > 0;
+  const coverSrc = coverSrcIndex < coverSources.length ? coverSources[coverSrcIndex] : null;
+  const showResume = book?.type === 'uploaded' && Number(book?.currentPage) > 1;
+  const showPreview = typeof book?.previewLink === 'string' && book.previewLink.trim().length > 0;
+  const progress = book?.status === 'completed' ? 100 : (book?.currentPage && book?.pages ? Math.round((book.currentPage / book.pages) * 100) : 0);
+  const statusClass = STATUS_STYLES[book?.status] || 'status-default';
+  const statusDot = STATUS_DOT[book?.status] || 'bg-slate-400';
+  const genreColor = GENRE_COLORS[Math.abs((book?.title || '').charCodeAt(0) % GENRE_COLORS.length)];
 
-  useEffect(() => {
-    const card = cardRef.current;
-
-    gsap.fromTo(
-      card,
-      { y: 50, opacity: 0, scale: 0.9 },
-      { y: 0, opacity: 1, scale: 1, duration: 0.6, ease: 'power3.out' }
-    );
-  }, []);
-
-  const handleMouseEnter = () => {
-    setIsHovered(true);
-    gsap.to(cardRef.current, {
-      y: -8,
-      scale: 1.02,
-      duration: 0.3,
-      ease: 'power2.out',
-    });
+  const handleMouseMove = (e) => {
+    const rect = cardRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const x = (e.clientX - rect.left) / rect.width;
+    const y = (e.clientY - rect.top) / rect.height;
+    const rotateX = (y - 0.5) * -12;
+    const rotateY = (x - 0.5) * 12;
+    setTilt({ x: rotateX, y: rotateY });
+    setGlowPos({ x: x * 100, y: y * 100 });
   };
 
   const handleMouseLeave = () => {
     setIsHovered(false);
     setShowMenu(false);
-    gsap.to(cardRef.current, {
-      y: 0,
-      scale: 1,
-      duration: 0.3,
-      ease: 'power2.out',
-    });
-  };
-
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'completed':
-        return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400';
-      case 'reading':
-        return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400';
-      case 'wishlist':
-        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400';
-      default:
-        return 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400';
-    }
-  };
-
-  const getProgress = () => {
-    if (!book) return 0;
-    if (book.status === 'completed') return 100;
-    if (book.status === 'reading' && book.currentPage && book.pages) {
-      return Math.round((book.currentPage / book.pages) * 100);
-    }
-    return 0;
+    setTilt({ x: 0, y: 0 });
+    setGlowPos({ x: 50, y: 50 });
   };
 
   const handleProgressChange = (e) => {
     e.stopPropagation();
     const newPage = parseInt(e.target.value, 10);
     setCurrentPage(newPage);
-    if (book && typeof onProgressUpdate === 'function') {
-      onProgressUpdate(book.id, newPage);
-    }
+    if (book && typeof onProgressUpdate === 'function') onProgressUpdate(book.id || book._id, newPage);
   };
-
-  const quickReactions = ['❤️', '👍', '🔥', '📚'];
 
   return (
     <div
       ref={cardRef}
-      className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg dark:shadow-gray-900/20 overflow-hidden cursor-pointer transition-all duration-300 hover:shadow-xl dark:hover:shadow-gray-900/40 group relative"
-      onMouseEnter={handleMouseEnter}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
-      onClick={() => (typeof onBookClick === 'function' ? onBookClick(book) : undefined)}
+      onClick={() => typeof onBookClick === 'function' && onBookClick(book)}
+      className="relative rounded-2xl overflow-hidden cursor-pointer animate-slide-in-up"
+      style={{
+        transform: isHovered ? `perspective(1000px) rotateX(${tilt.x}deg) rotateY(${tilt.y}deg) translateZ(8px)` : 'perspective(1000px) rotateX(0) rotateY(0)',
+        transition: isHovered ? 'transform 0.1s ease-out, box-shadow 0.3s ease' : 'transform 0.4s ease-out, box-shadow 0.4s ease',
+        boxShadow: isHovered ? '0 20px 50px rgba(0,0,0,0.8), 0 0 30px rgba(124,58,237,0.2)' : '0 4px 20px rgba(0,0,0,0.5)',
+        background: 'rgba(15,15,26,0.9)',
+        border: `1px solid ${isHovered ? 'rgba(124,58,237,0.4)' : 'rgba(255,255,255,0.06)'}`,
+        willChange: 'transform',
+      }}
     >
-      <div className="relative">
-        <div className="w-full h-48 bg-gray-100 dark:bg-gray-900 overflow-hidden flex items-center justify-center">
-          {coverSrc ? (
-            <img
-              src={coverSrc}
-              alt={book?.title || 'Book cover'}
-              className="w-full h-48 object-cover transition-transform duration-300 group-hover:scale-105"
-              onError={(e) => {
-                e.currentTarget.onerror = null;
-                setCoverSrcIndex((i) => {
-                  const next = i + 1;
-                  return next < coverSources.length ? next : coverSources.length;
-                });
-              }}
-            />
-          ) : (
-            <div className="flex flex-col items-center justify-center text-gray-400 dark:text-gray-500">
-              <BookOpen className="h-8 w-8 mb-2" />
-              <span className="text-xs">Cover unavailable</span>
-            </div>
-          )}
-        </div>
-        <div className="absolute top-4 left-4">
-          <span
-            className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(
-              book?.status
-            )}`}
-          >
-            {book?.status || 'unknown'}
+      {/* Mouse glow follower */}
+      {isHovered && (
+        <div
+          className="absolute inset-0 pointer-events-none z-0 transition-opacity duration-300"
+          style={{
+            background: `radial-gradient(200px circle at ${glowPos.x}% ${glowPos.y}%, rgba(124,58,237,0.12), transparent 70%)`,
+          }}
+        />
+      )}
+
+      {/* Cover area */}
+      <div className="relative h-52 overflow-hidden">
+        {/* Genre gradient header */}
+        <div className={`absolute inset-0 bg-gradient-to-br ${genreColor} opacity-60`} />
+
+        {coverSrc ? (
+          <img
+            src={coverSrc}
+            alt={book?.title || 'Book cover'}
+            className="w-full h-full object-cover transition-transform duration-500"
+            style={{ transform: isHovered ? 'scale(1.06)' : 'scale(1)' }}
+            onError={() => setCoverSrcIndex(i => Math.min(i + 1, coverSources.length))}
+          />
+        ) : (
+          <div className="w-full h-full flex flex-col items-center justify-center gap-2 text-slate-600">
+            <BookOpen className="h-10 w-10" />
+            <span className="text-xs font-medium">No cover</span>
+          </div>
+        )}
+
+        {/* Status chip */}
+        <div className="absolute top-3 left-3 z-10">
+          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold backdrop-blur-sm ${statusClass}`}>
+            <span className={`w-1.5 h-1.5 rounded-full ${statusDot}`} />
+            {book?.status || 'added'}
           </span>
         </div>
 
-        <div className="absolute top-4 right-4">
-          <div className="relative">
-            <button
-              className="p-2 bg-white/90 dark:bg-gray-800/90 rounded-full hover:bg-white dark:hover:bg-gray-800 transition-colors duration-200"
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowMenu(!showMenu);
-              }}
-            >
-              <MoreHorizontal className="h-4 w-4 text-gray-600 dark:text-gray-400" />
-            </button>
-
-            {showMenu && (
-              <div className="absolute right-0 top-12 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-2 z-10 min-w-[120px]">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (typeof onBookEdit === 'function') {
-                      onBookEdit(book);
-                    }
-                    setShowMenu(false);
-                  }}
-                  className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center space-x-2"
-                >
-                  <Edit className="h-4 w-4" />
-                  <span>Edit</span>
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {book?.status === 'reading' && book?.pages && book?.type !== 'uploaded' && (
-          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/50 to-transparent p-4">
-            <div className="bg-white/20 rounded-full h-2 mb-2">
-              <div
-                className="bg-blue-500 h-2 rounded-full transition-all duration-500"
-                style={{ width: `${getProgress()}%` }}
-              ></div>
-            </div>
-            <p className="text-white text-sm font-medium">{getProgress()}% complete</p>
-          </div>
-        )}
-
-        {isHovered && (
-          <div className="absolute bottom-4 right-4 flex space-x-1">
-            {quickReactions.map((emoji) => (
+        {/* Menu button */}
+        <div className="absolute top-3 right-3 z-10">
+          <button
+            className="p-1.5 rounded-xl bg-black/40 backdrop-blur hover:bg-black/60 transition-colors"
+            onClick={(e) => { e.stopPropagation(); setShowMenu(!showMenu); }}
+          >
+            <MoreHorizontal className="h-4 w-4 text-white/80" />
+          </button>
+          {showMenu && (
+            <div className="absolute right-0 top-10 glass rounded-xl shadow-2xl py-1 z-20 min-w-[120px] animate-fade-in">
               <button
-                key={emoji}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onReactionClick(book.id, emoji);
-                }}
-                className="w-8 h-8 bg-white/90 dark:bg-gray-800/90 rounded-full flex items-center justify-center hover:scale-110 transition-transform duration-200"
+                onClick={(e) => { e.stopPropagation(); typeof onBookEdit === 'function' && onBookEdit(book); setShowMenu(false); }}
+                className="w-full px-4 py-2 text-left text-sm text-slate-300 hover:bg-white/5 flex items-center gap-2 transition-colors"
               >
-                <span className="text-sm">{emoji}</span>
+                <Edit className="h-3.5 w-3.5 text-violet-400" /> Edit
               </button>
-            ))}
-          </div>
-        )}
-      </div>
-
-      <div className="p-6">
-        <div className="flex items-start justify-between mb-3">
-          <div className="flex-1">
-            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-1 line-clamp-2 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors duration-200">
-              {book?.title || 'Untitled'}
-            </h3>
-            {book?.author ? (
-              <p className="text-gray-600 dark:text-gray-400 text-sm">by {book.author}</p>
-            ) : null}
-          </div>
-          {book?.rating && (
-            <div className="flex items-center space-x-1 ml-4">
-              <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                {book.rating}
-              </span>
             </div>
           )}
         </div>
 
-        <div className="flex flex-wrap gap-1 mb-4 min-h-[1.5rem]">
-          {(Array.isArray(book?.genre) ? book.genre : Array.isArray(book?.categories) ? book.categories : [])
-            .slice(0, 3)
-            .map((genre, index) => (
-              <span
-                key={index}
-                className="px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 text-xs rounded-full"
-              >
-                {genre}
-              </span>
-            ))}
-        </div>
-
-        <div className="flex items-center justify-between text-sm text-gray-600 dark:text-gray-400 mb-4">
-          <div className="flex items-center space-x-4">
-            {book?.pages ? (
-              <div className="flex items-center space-x-1">
-                <BookOpen className="h-4 w-4" />
-                <span>{book.pages} pages</span>
-              </div>
-            ) : null}
-            {book?.startDate && (
-              <div className="flex items-center space-x-1">
-                <Clock className="h-4 w-4" />
-                <span>{new Date(book.startDate).toLocaleDateString()}</span>
-              </div>
-            )}
-          </div>
-        </div>
-
+        {/* Progress overlay at bottom of cover */}
         {book?.status === 'reading' && book?.pages && book?.type !== 'uploaded' && (
-          <div className="mb-4">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                Reading Progress
-              </span>
-              <span className="text-sm text-gray-600 dark:text-gray-400">
-                {currentPage} / {book.pages}
-              </span>
+          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent pt-6 pb-3 px-4">
+            <div className="progress-bar mb-1">
+              <div className="progress-fill" style={{ width: `${progress}%` }} />
             </div>
-            <input
-              type="range"
-              min="0"
-              max={book.pages}
-              value={currentPage}
-              onChange={handleProgressChange}
-              className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer slider"
-              onClick={(e) => e.stopPropagation()}
-            />
+            <p className="text-white/80 text-xs">{progress}% complete</p>
           </div>
         )}
 
-        {book?.type === 'uploaded' ? (
-          <div className="pt-4 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              {showResume ? (
+        {/* Hover quick-action toolbar */}
+        <div className={`absolute inset-x-0 bottom-0 p-3 flex justify-center gap-2 transition-all duration-300 ${isHovered && book?.type !== 'reading' ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'}`}>
+          {book?.type === 'uploaded' && (
+            <>
+              {showResume && (
                 <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    navigate(`/reader/${book.id || book._id}?page=${Number(book.currentPage) || 1}`);
-                  }}
-                  className="inline-flex items-center rounded-full bg-blue-600 text-white px-4 py-1.5 text-xs font-semibold shadow-sm hover:bg-blue-700 transition-colors"
+                  onClick={(e) => { e.stopPropagation(); navigate(`/reader/${book.id || book._id}?page=${book.currentPage || 1}`); }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-violet-600/90 backdrop-blur rounded-xl text-white text-xs font-semibold hover:bg-violet-600 transition-colors"
                 >
-                  <Play className="h-4 w-4 mr-1.5" />
-                  Resume Reading
+                  <Play className="h-3 w-3" /> Resume
                 </button>
-              ) : null}
-
+              )}
               <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (typeof onReadUploaded === 'function') {
-                    onReadUploaded(book);
-                  }
-                }}
-                className="inline-flex items-center rounded-full bg-gray-900 text-white dark:bg-gray-700 px-4 py-1.5 text-xs font-semibold shadow-sm hover:bg-black dark:hover:bg-gray-600 transition-colors"
+                onClick={(e) => { e.stopPropagation(); typeof onReadUploaded === 'function' && onReadUploaded(book); }}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-black/60 backdrop-blur rounded-xl text-white text-xs font-semibold hover:bg-black/80 transition-colors border border-white/10"
               >
-                <BookOpen className="h-4 w-4 mr-1.5" />
-                Open Reader
+                <BookOpen className="h-3 w-3" /> Open
               </button>
-            </div>
-
-            {showPreview ? (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  window.open(book.previewLink, '_blank', 'noopener,noreferrer');
-                }}
-                className="inline-flex items-center rounded-full bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 px-3 py-1.5 text-xs font-semibold border border-gray-200 dark:border-gray-700 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-              >
-                <ExternalLink className="h-4 w-4 mr-1.5" />
-                Read Preview
-              </button>
-            ) : null}
-          </div>
-        ) : showPreview ? (
-          <div className="pt-4 border-t border-gray-200 dark:border-gray-700 flex justify-end">
+            </>
+          )}
+          {showPreview && (
             <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                window.open(book.previewLink, '_blank', 'noopener,noreferrer');
-              }}
-              className="inline-flex items-center rounded-full bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-100 px-4 py-1.5 text-xs font-semibold border border-gray-200 dark:border-gray-600 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+              onClick={(e) => { e.stopPropagation(); window.open(book.previewLink, '_blank', 'noopener,noreferrer'); }}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-black/60 backdrop-blur rounded-xl text-white text-xs font-semibold hover:bg-black/80 transition-colors border border-white/10"
             >
-              <ExternalLink className="h-4 w-4 mr-1.5" />
-              Read Preview
+              <ExternalLink className="h-3 w-3" /> Preview
             </button>
-          </div>
-        ) : null}
+          )}
+        </div>
+      </div>
 
-        {book?.reactions && Object.keys(book.reactions).length > 0 && (
-          <div className="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-gray-700">
-            <div className="flex items-center space-x-3">
-              {Object.entries(book.reactions)
-                .slice(0, 3)
-                .map(([emoji, count]) => (
-                  <button
-                    key={emoji}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (typeof onReactionClick === 'function') {
-                        onReactionClick(book.id, emoji);
-                      }
-                    }}
-                    className="flex items-center space-x-1 px-2 py-1 rounded-full bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors duration-200"
-                  >
-                    <span className="text-sm">{emoji}</span>
-                    <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
-                      {count}
-                    </span>
-                  </button>
-                ))}
-            </div>
-            <div className="flex items-center space-x-2">
-              <button
-                onClick={(e) => e.stopPropagation()}
-                className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors duration-200"
-              >
-                <Heart className="h-4 w-4 text-gray-500 dark:text-gray-400" />
-              </button>
-              <button
-                onClick={(e) => e.stopPropagation()}
-                className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors duration-200"
-              >
-                <MessageCircle className="h-4 w-4 text-gray-500 dark:text-gray-400" />
-              </button>
-              <button
-                onClick={(e) => e.stopPropagation()}
-                className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors duration-200"
-              >
-                <Share2 className="h-4 w-4 text-gray-500 dark:text-gray-400" />
-              </button>
-            </div>
+      {/* Content */}
+      <div className="p-4 relative z-10 flex flex-col h-[180px]">
+        <div className="flex items-start justify-between mb-2 gap-2">
+          <div className="flex-1 min-w-0">
+            <h3 className="font-bold text-white text-[15px] leading-tight line-clamp-2 group-hover:text-violet-300 transition-colors">
+              {book?.title || 'Untitled'}
+            </h3>
+            {book?.author && <p className="text-slate-400 text-xs mt-1 truncate">by {book.author}</p>}
           </div>
-        )}
+          {book?.rating > 0 && (
+            <div className="flex items-center gap-1 bg-amber-500/10 px-2 py-1 rounded-lg flex-shrink-0 border border-amber-500/20">
+              <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+              <span className="text-xs font-bold text-amber-400">{book.rating}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Genre tags */}
+        <div className="flex flex-wrap gap-1.5 mb-3">
+          {(Array.isArray(book?.genre) ? book.genre : Array.isArray(book?.categories) ? book.categories : []).slice(0, 2).map((g, i) => (
+            <span key={i} className="px-2 py-0.5 rounded-md text-[10px] font-semibold tracking-wide uppercase bg-white/5 border border-white/10 text-slate-300">{g}</span>
+          ))}
+        </div>
+
+        <div className="mt-auto">
+          {/* Meta row */}
+          <div className="flex items-center gap-3 text-xs text-slate-500 mb-3">
+             {book?.pages ? (
+               <span className="flex items-center gap-1.5"><BookOpen className="h-3 w-3 text-violet-400" /> {book.pages}</span>
+             ) : (
+                <span className="flex items-center gap-1.5 opacity-50"><BookOpen className="h-3 w-3" /> --</span>
+             )}
+             {book?.startDate ? (
+               <span className="flex items-center gap-1.5"><Clock className="h-3 w-3 text-cyan-400" /> {new Date(book.startDate).toLocaleDateString('en', { month: 'short', year: '2-digit' })}</span>
+             ) : (
+                <span className="flex items-center gap-1.5 opacity-50"><Clock className="h-3 w-3" /> --</span>
+             )}
+             {book?.type === 'uploaded' && (
+               <span className="flex items-center gap-1.5 text-emerald-400 ml-auto bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20"><Zap className="h-3 w-3" /> PDF</span>
+             )}
+          </div>
+
+          {/* Progress slider */}
+          {(book?.status === 'reading' && book?.pages && book?.type !== 'uploaded') ? (
+            <div className="mb-2">
+              <div className="flex justify-between text-[10px] font-bold tracking-wider uppercase text-slate-500 mb-1.5">
+                <span>Progress</span>
+                <span className="text-violet-400">{currentPage} / {book.pages}</span>
+              </div>
+              <input
+                type="range" min="0" max={book.pages} value={currentPage}
+                onChange={handleProgressChange}
+                onClick={(e) => e.stopPropagation()}
+                className="w-full slider h-1.5"
+              />
+            </div>
+          ) : null}
+
+          {/* Reactions */}
+          {book?.reactions && Object.keys(book.reactions).length > 0 && (
+            <div className="flex items-center gap-2 pt-3 mt-2 border-t border-white/5">
+              {Object.entries(book.reactions).slice(0, 4).map(([emoji, count]) => (
+                <button
+                  key={emoji}
+                  onClick={(e) => { e.stopPropagation(); typeof onReactionClick === 'function' && onReactionClick(book.id || book._id, emoji); }}
+                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/5 hover:bg-violet-500/20 border border-transparent hover:border-violet-500/30 transition-colors text-xs"
+                >
+                  <span className="text-sm">{emoji}</span>
+                  <span className="text-slate-400 font-medium">{count}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
 };
 
 export default LibraryBookCard;
-

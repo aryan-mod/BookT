@@ -14,6 +14,20 @@ router.get('/progress', readerController.getProgress);
 router.patch('/progress', readerController.updateProgress);
 router.post('/progress', readerController.updateProgress);
 
+// REST-style aliases used by the frontend reader page.
+router.get('/progress/:bookId', (req, res, next) => {
+  req.query.bookId = req.params.bookId;
+  return readerController.getProgress(req, res, next);
+});
+router.post('/progress/:bookId', (req, res, next) => {
+  req.body.bookId = req.params.bookId;
+  return readerController.updateProgress(req, res, next);
+});
+router.patch('/progress/:bookId', (req, res, next) => {
+  req.body.bookId = req.params.bookId;
+  return readerController.updateProgress(req, res, next);
+});
+
 router.get('/dashboard/stats', readerAnalyticsController.getDashboardStats);
 router.get('/dashboard/streak', readerAnalyticsController.getStreak);
 router.get('/dashboard/activity', readerAnalyticsController.getActivity);

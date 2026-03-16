@@ -2,8 +2,10 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const cookieParser = require('cookie-parser');
+const path = require('path');
 const routes = require('./routes');
 const errorHandler = require('./middleware/errorHandler');
+const { protect } = require('./middleware/auth');
 const {
   sanitizeData,
   sanitizeXss,
@@ -66,6 +68,19 @@ app.use(express.json({ limit: '10kb' }));
 
 app.use(sanitizeData());
 app.use(sanitizeXss());
+
+// Serve PDF files inline (not as downloads).
+// Mounted behind auth to avoid exposing private uploads.
+app.use(
+  '/api/v1/pdfs',
+  protect,
+  express.static(path.join(__dirname, '..', 'public', 'pdfs'), {
+    setHeaders: (res) => {
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', 'inline');
+    },
+  })
+);
 
 app.use('/api/v1', routes);
 
