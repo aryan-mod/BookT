@@ -109,8 +109,8 @@ export default function Login() {
                   id="email" type="email" value={email}
                   onChange={e => setEmail(e.target.value)}
                   required autoComplete="email"
-                  placeholder="you@example.com"
-                  className="nx-input pl-10"
+                  placeholder="you@example.com "
+                  className="nx-input pl-10 "
                 />
               </div>
             </div>

@@ -1,262 +1,329 @@
-# 📚 BookT - Book Tracking & Reading Analytics Platform
+# 📚 NexusRead
 
-<div align="center">
+> **Your intelligent reading companion.** A full-stack SaaS book tracker with AI-powered insights, gamification, a built-in PDF reader, and a community marketplace — built on the MERN stack.
 
-![React](https://img.shields.io/badge/React-18-61DAFB?style=flat-square&logo=react)
-![Node.js](https://img.shields.io/badge/Node.js-20+-339933?style=flat-square&logo=node.js)
-![MongoDB](https://img.shields.io/badge/MongoDB-Atlas-47A248?style=flat-square&logo=mongodb)
-![Express](https://img.shields.io/badge/Express-4-000000?style=flat-square&logo=express)
-![Vite](https://img.shields.io/badge/Vite-5-646CFF?style=flat-square&logo=vite)
-![Tailwind CSS](https://img.shields.io/badge/Tailwind-3-06B6D4?style=flat-square&logo=tailwindcss)
-![JWT](https://img.shields.io/badge/JWT-Auth-000000?style=flat-square&logo=jsonwebtokens)
-![License](https://img.shields.io/badge/License-ISC-blue?style=flat-square)
-
-**A full-stack MERN application for tracking your reading habits, building a personal library, and visualizing reading analytics.**
-
-[Live Demo](https://booktracker-psi.vercel.app) · [Documentation](./PROJECT_DOCUMENTATION.md) · [Report Bug](https://github.com/aryan-mod/BookT/issues) · [Request Feature](https://github.com/aryan-mod/BookT/issues)
-
-</div>
-
----
-
-## 📸 Screenshots
-
-<!-- Add your screenshots here - replace placeholder paths with actual images -->
-<table>
-  <tr>
-    <td><strong>Dashboard</strong><br/><img src="docs/screenshots/dashboard.png" alt="Dashboard" width="400"/><br/><em>Reading stats, streak tracker, and library overview</em></td>
-    <td><strong>Library</strong><br/><img src="docs/screenshots/library.png" alt="Library" width="400"/><br/><em>Personal library with progress tracking</em></td>
-  </tr>
-  <tr>
-    <td><strong>Reader</strong><br/><img src="docs/screenshots/reader.png" alt="PDF Reader" width="400"/><br/><em>In-browser PDF reader with progress sync</em></td>
-    <td><strong>Admin Panel</strong><br/><img src="docs/screenshots/admin.png" alt="Admin" width="400"/><br/><em>User and book request management</em></td>
-  </tr>
-</table>
-
-> **Screenshot Placeholders:** Add your actual screenshots to `docs/screenshots/` (e.g., `dashboard.png`, `library.png`, `reader.png`, `admin.png`)
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-nexusread.vercel.app-6d28d9?style=for-the-badge&logo=vercel)](https://nexusread.vercel.app/)
+[![GitHub](https://img.shields.io/badge/GitHub-aryanKDev%2Fnexusread-181717?style=for-the-badge&logo=github)](https://github.com/aryanKDev/nexusread)
+[![Status](https://img.shields.io/badge/Status-Active-22c55e?style=for-the-badge)]()
+[![Stack](https://img.shields.io/badge/Stack-MERN-61DAFB?style=for-the-badge&logo=react)]()
 
 ---
 
 ## ✨ Features
 
+### 📖 Reading & Library
+- **Personal book library** with status tracking: `wishlist → reading → completed`
+- **In-browser PDF Reader** — upload PDFs, read inline, auto-resume from last page
+- **Reading progress persistence** — page position saved on tab close via `fetch` + `keepalive`
+- **Reading session logging** — tracks time spent per book
+- **Highlights & notes** — text highlights stored per page with timestamps
+
+### 🤖 AI Assistant (Gemini-powered)
+- **Summarize** — generate concise summaries of selected passages
+- **Explain** — plain-language explanations of complex text
+- **Define** — in-context word definitions
+- **Ask** — Q&A with book context as a grounding prompt
+- **Smart Notes** — auto-generate structured notes from your highlights (max 50)
+
+### 📊 Analytics Dashboard
+- Reading activity heatmap
+- Pages read over time (Recharts charts)
+- Reading streaks tracker
+- Word cloud from highlights
+- Stats panel: books read, pages, average rating, streaks
+
+### 🏆 Gamification
+- **Badges system** — 9 badges: First Chapter, Bookworm, Bibliophile, Week Warrior, Monthly Legend, Page Turner, Marathon Reader, Night Owl, Speed Reader
+- **Coins** — earned per badge (+25 per badge)
+- **Leaderboard** — top readers ranked by completed books (public, opt-in)
+- Badge award triggers push notifications
+
+### 🛒 Marketplace
+- Browse and purchase books listed by admins
+- Shopping cart with order management
+- Book detail pages with reviews and ratings
+- Preview click tracking
+
 ### 🔐 Authentication
-- **Email/Password** registration and login
-- **Google OAuth** single sign-on
-- **JWT** access tokens + HttpOnly refresh cookie (rotation & reuse detection)
-- Protected routes with role-based access (user, admin)
+- Email/password registration & login
+- **Google OAuth 2.0** (one-click sign-in)
+- JWT Access Token (15-min lifetime, in-memory only — never `localStorage`)
+- Refresh Token rotation with **theft detection** — reuse triggers full session revocation
+- HttpOnly cookie storage for refresh tokens
+- Silent token refresh via Axios interceptor (queue-deduplication safe)
 
-### 📖 Library & Reading
-- **Add books** from Google Books and Open Library APIs
-- **Upload PDFs** (stored in Cloudinary)
-- **Track progress** — current page, status (wishlist/reading/completed), ratings
-- **In-browser PDF reader** with auto-save progress on close
+### 🛡️ Admin Panel
+- **Book request approval system** — users submit books, admins approve/reject
+- **User management** — list all users, toggle ban/unban with audit trail
+- Admin cannot ban themselves or other admins
+- Banning a user immediately invalidates all their refresh tokens
+- **Audit logs** — last 50 admin actions with populated actor + target
+- **Admin stats** — total users, total books, pending requests, approved today
+- Admin-specific routes: `/admin/overview`, `/admin/requests`, `/admin/users`, `/admin/books`, `/admin/analytics`
 
-### 📊 Analytics & Goals
-- **Streak tracker** — current and longest reading streaks
-- **Reading heatmap** — visualize daily activity
-- **Charts** — pages read, books completed over time
-- **Activity feed** — recent reading sessions
-- **Word cloud** — genre distribution
-- **Yearly goals** — set targets and track completion
+### 🌐 Community & Social
+- Public user profiles with reading history
+- Social follow/activity feed system
+- Review & rating system per book
+- Book request submissions from users
 
-### 🔍 Discovery
-- **Aggregated search** across multiple book APIs
-- **Explore** global catalogue
-- **Book requests** — users can request new books; admins approve/reject
-
-### 👑 Admin Panel
-- **User management** — view users, ban/unban
-- **Book requests** — approve or reject submissions
-- **Book catalogue** — manage global books
-- **Analytics** — platform statistics
-- **Audit logs** — admin action history
-
-### 🎨 UX
-- **Dark/Light theme** with persistence
-- **Responsive design** (Tailwind CSS)
-- **Animations** (Framer Motion, GSAP)
-- **Toast notifications**
-- **Form validation** (Zod, react-hook-form)
+### 🔔 Notifications
+- In-app notification system (badge earned, admin actions, etc.)
+- `NotificationContext` polling on frontend
 
 ---
 
 ## 🛠️ Tech Stack
 
-| Layer | Technologies |
-|-------|--------------|
-| **Frontend** | React 18, Vite 5, React Router 7, Tailwind CSS, Recharts, Framer Motion, react-pdf |
-| **Backend** | Node.js, Express 4, MongoDB, Mongoose 8 |
-| **Auth** | JWT, bcrypt, Google OAuth, HttpOnly cookies |
-| **Storage** | MongoDB Atlas, Cloudinary (PDFs) |
-| **Security** | Helmet, CORS, rate limiting, mongo-sanitize, xss-clean |
-| **External APIs** | Google Books API, Open Library API |
+### Frontend
+| Technology | Purpose |
+|---|---|
+| React 18 + Vite | UI framework & build tool |
+| TypeScript | Type safety |
+| TailwindCSS | Utility-first styling |
+| Framer Motion + GSAP | Page transitions & micro-animations |
+| React Router v7 | Client-side routing |
+| Axios | HTTP client with request/response interceptors |
+| Recharts | Analytics charts |
+| react-pdf | In-browser PDF rendering |
+| react-hook-form + Zod | Form management & validation |
+| @react-oauth/google | Google Sign-In integration |
+| lucide-react | Icon system |
+
+### Backend
+| Technology | Purpose |
+|---|---|
+| Node.js + Express | REST API server |
+| MongoDB + Mongoose | Database & ODM |
+| JSON Web Tokens (JWT) | Stateless access token authentication |
+| bcryptjs | Password hashing (salt rounds: 10) |
+| cookie-parser | HttpOnly cookie management |
+| Helmet | HTTP security headers |
+| express-rate-limit | Brute-force protection |
+| express-mongo-sanitize | NoSQL injection prevention |
+| xss-clean | XSS payload sanitization |
+| Multer | File upload handling (PDF) |
+| Cloudinary | Cloud PDF storage (optional) |
+| google-auth-library | Google OAuth token verification |
+| express-validator | Input validation middleware |
+
+### Database Models
+`User` · `Book` · `BookRequest` · `RefreshToken` · `ReadingProgress` · `ReadingSession` · `UploadedBook` · `UploadedBookReadingProgress` · `UploadedBookReadingSession` · `Highlight` · `Note` · `Goal` · `Notification` · `Review` · `Order` · `AdminAction` · `PreviewClick`
+
+### Infrastructure & Tools
+- **Vercel** — frontend deployment
+- **MongoDB Atlas** — managed cloud database
+- **Cloudinary** — PDF/media CDN (optional flag: `USE_CLOUDINARY_PDF`)
+- **Gemini API** — AI features (summarize, explain, define, ask, smart-notes)
+- **Google Books API** — external book search/metadata
 
 ---
 
-## 🏗️ Architecture
+## 🏗️ Architecture Overview
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                              CLIENT (React + Vite)                            │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐  │
-│  │   AuthContext│  │LibraryContext│  │ToastContext │  │  Axios Interceptor   │  │
-│  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘  │  (401 → refresh)     │  │
-│         │                │                │         └──────────┬──────────┘  │
-│         └────────────────┴────────────────┴────────────────────┘             │
-│                                    │                                          │
-│  Pages: Dashboard | Explore | Reader | Upload | Admin                         │
-└────────────────────────────────────┼─────────────────────────────────────────┘
-                                     │ HTTP (credentials: true)
-                                     ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                         API (Express)  /api/v1                               │
-│  ┌────────────┐  ┌────────────┐  ┌────────────┐  ┌────────────┐  ┌────────┐ │
-│  │   /auth    │  │   /books   │  │/book-req   │  │  /admin    │  │/reader │ │
-│  │ register   │  │ search     │  │ approve    │  │ stats      │  │ upload │ │
-│  │ login      │  │ library    │  │ reject     │  │ users      │  │ progress│
-│  │ google     │  │ add        │  │            │  │ audit      │  │ goals  │ │
-│  │ refresh    │  │ update     │  │            │  │ ban        │  │        │ │
-│  └─────┬──────┘  └─────┬──────┘  └─────┬──────┘  └─────┬──────┘  └───┬────┘ │
-│        │               │               │               │             │      │
-│  ┌─────▼───────────────▼───────────────▼───────────────▼─────────────▼────┐ │
-│  │  Middleware: auth (protect, restrictTo) | rate limit | validate       │ │
-│  └───────────────────────────────────────────────────────────────────────┘ │
-└────────────────────────────────────┬────────────────────────────────────────┘
-                                     │
-         ┌───────────────────────────┼───────────────────────────┐
-         ▼                           ▼                           ▼
-┌─────────────────┐      ┌─────────────────┐      ┌─────────────────┐
-│    MongoDB      │      │   Cloudinary    │      │ Google Books    │
-│  User, Book,    │      │   PDF Storage   │      │ Open Library    │
-│  Progress, etc. │      │                 │      │ (External APIs) │
-└─────────────────┘      └─────────────────┘      └─────────────────┘
+┌─────────────────────────────────────────────────────┐
+│                   FRONTEND (Vercel)                 │
+│  React + Vite · TailwindCSS · Framer Motion         │
+│                                                     │
+│  AuthContext ──► Axios (in-memory token)            │
+│       │              │                              │
+│       │     Interceptor: auto-refresh on 401        │
+│       ▼              ▼                              │
+│  ProtectedRoute   API calls (/api/v1/*)             │
+└──────────────────────┬──────────────────────────────┘
+                       │ HTTPS + credentials: true
+                       │ (withCredentials for cookies)
+┌──────────────────────▼──────────────────────────────┐
+│               BACKEND (Express API)                 │
+│                                                     │
+│  Helmet · CORS allowlist · Body limit 10kb          │
+│  mongo-sanitize · xss-clean · rate limiters         │
+│                                                     │
+│  /api/v1/auth      JWT + Refresh Token rotation     │
+│  /api/v1/books     Library CRUD                     │
+│  /api/v1/reader    PDF upload + progress sessions   │
+│  /api/v1/ai        Gemini-powered AI endpoints      │
+│  /api/v1/admin     User mgmt + audit logs           │
+│  /api/v1/gamification  Badges + leaderboard         │
+│  /api/v1/marketplace   Book sales + orders          │
+│  /api/v1/social    Follow + activity feed           │
+│  /api/v1/reviews   Book ratings                     │
+│  /api/v1/notifications  In-app alerts               │
+└──────────────────────┬──────────────────────────────┘
+                       │
+┌──────────────────────▼──────────────────────────────┐
+│         MongoDB Atlas (Multi-collection)            │
+│  Users isolated by userId ref on every document     │
+└─────────────────────────────────────────────────────┘
 ```
 
-### System Architecture (Mermaid)
+**Auth Flow:**
+1. Login → server signs short-lived **access token** (15m) + creates **refresh token** DB record → refresh token set as `HttpOnly` cookie
+2. Frontend stores access token **in memory** (`useRef`) — never `localStorage`
+3. Axios request interceptor attaches `Authorization: Bearer <token>` header
+4. On 401, response interceptor fires a single `/auth/refresh` call (deduped with promise reference), silently obtains a new access token, retries the original request
+5. Refresh token **rotation** on every use — reuse detected = all sessions revoked
 
-```mermaid
-flowchart TB
-    subgraph Client["Frontend (React + Vite)"]
-        A[AuthContext] --> R[Router]
-        L[LibraryContext] --> R
-        T[ToastContext] --> R
-        R --> P1[Dashboard]
-        R --> P2[Explore]
-        R --> P3[Reader]
-        R --> P4[Admin]
-    end
+---
 
-    subgraph API["Backend (Express)"]
-        Auth[/auth]
-        Books[/books]
-        Reader[/reader]
-        Admin[/admin]
-    end
-
-    subgraph Data["Data & Services"]
-        MongoDB[(MongoDB)]
-        Cloudinary[Cloudinary]
-        ExtAPI[Google Books / Open Library]
-    end
-
-    Client -->|HTTPS + Credentials| API
-    API --> MongoDB
-    API --> Cloudinary
-    API --> ExtAPI
-```
-
-### Folder Structure
+## 📁 Folder Structure
 
 ```
-BookT/
-├── src/                    # Frontend (React)
-│   ├── api/                # Axios config
-│   ├── components/         # UI components
-│   ├── context/            # Auth, Toast, Library
-│   ├── hooks/              # useBooks, useTheme, etc.
-│   ├── pages/              # Route pages
-│   └── main.jsx
-├── backend/
-│   ├── config/             # db, cloudinary, rateLimit
+nexusread/
+├── backend/                    # Express API (the main production backend)
+│   ├── config/
+│   │   ├── cloudinary.js       # Cloudinary SDK init
+│   │   ├── rateLimit.js        # API & search rate limiters
+│   │   └── redis.js            # Redis config (future caching)
 │   ├── src/
-│   │   ├── controllers/    # Request handlers
-│   │   ├── middleware/     # auth, validate, security
-│   │   ├── models/         # Mongoose schemas
-│   │   ├── routes/         # API routes
-│   │   ├── services/       # External APIs, cache
-│   │   └── utils/          # tokenUtils, AppError, etc.
-│   └── server.js
-├── vercel.json             # SPA rewrite for deployment
-└── package.json
+│   │   ├── app.js              # Express setup (Helmet, CORS, middleware chain)
+│   │   ├── controllers/        # 14 controllers
+│   │   │   ├── authController.js
+│   │   │   ├── adminController.js
+│   │   │   ├── bookController.js
+│   │   │   ├── reader.controller.js
+│   │   │   ├── ai.controller.js
+│   │   │   ├── gamification.controller.js
+│   │   │   ├── marketplace.controller.js
+│   │   │   ├── social.controller.js
+│   │   │   ├── review.controller.js
+│   │   │   ├── notification.controller.js
+│   │   │   ├── order.controller.js
+│   │   │   ├── bookRequestController.js
+│   │   │   └── readerAnalytics.controller.js
+│   │   ├── models/             # 18 Mongoose models
+│   │   ├── routes/             # 14 route files + index.js
+│   │   ├── middleware/
+│   │   │   ├── auth.js         # protect / optionalProtect / restrictTo
+│   │   │   ├── security.js     # loginLimiter, registerLimiter, sanitize, xss
+│   │   │   └── errorHandler.js
+│   │   ├── services/
+│   │   │   ├── aiService.js    # Gemini API wrapper
+│   │   │   ├── cacheService.js
+│   │   │   └── openLibraryService.js
+│   │   └── utils/
+│   │       ├── AppError.js
+│   │       ├── catchAsync.js
+│   │       ├── tokenUtils.js   # signAccessToken / verifyAccessToken
+│   │       ├── cookieUtils.js  # set/clear/get refresh token cookie
+│   │       └── logger.js       # Auth event logger
+│   ├── public/pdfs/            # Local PDF storage (when Cloudinary is off)
+│   ├── .env.example
+│   └── server.js               # Entry point
+│
+├── src/                        # React frontend (Vite)
+│   ├── api/
+│   │   └── axios.js            # Axios instance + silent refresh interceptor
+│   ├── context/
+│   │   ├── AuthContext.jsx     # Auth state, login/logout/Google OAuth
+│   │   ├── LibraryContext.jsx  # Personal book library
+│   │   ├── CartContext.jsx     # Marketplace cart
+│   │   ├── NotificationContext.jsx
+│   │   └── ToastContext.jsx
+│   ├── components/
+│   │   ├── ProtectedRoute.jsx
+│   │   ├── AdminProtectedRoute.jsx
+│   │   ├── AIAssistant.jsx
+│   │   ├── BookTracker.jsx     # Core library view
+│   │   ├── ReadingCharts.jsx
+│   │   ├── ReadingHeatmap.jsx
+│   │   ├── StreakTracker.jsx
+│   │   ├── WordCloud.jsx
+│   │   ├── StatsPanel.jsx
+│   │   └── admin/              # Admin layout + sub-components
+│   ├── pages/
+│   │   ├── Dashboard.jsx
+│   │   ├── Reader.jsx          # PDF reader with AI assistant sidebar
+│   │   ├── Analytics.jsx
+│   │   ├── Explore.jsx         # Book discovery + OpenLibrary search
+│   │   ├── Marketplace.jsx
+│   │   ├── BookDetail.jsx
+│   │   ├── Leaderboard.jsx
+│   │   ├── Profile.jsx
+│   │   ├── UploadPage.jsx
+│   │   ├── Cart.jsx
+│   │   ├── Login.jsx           # Email + Google OAuth
+│   │   ├── Register.jsx
+│   │   └── admin/
+│   │       ├── AdminOverview.jsx
+│   │       ├── AdminRequests.jsx
+│   │       ├── AdminUsers.jsx
+│   │       ├── AdminBooks.jsx
+│   │       └── AdminAnalytics.jsx
+│   ├── App.jsx                 # Route definitions + provider tree
+│   └── index.css               # Global styles + Tailwind base
+│
+├── vercel.json                 # Vercel SPA rewrite rules
+├── vite.config.ts
+└── tailwind.config.js
 ```
 
 ---
 
-## 🚀 Installation
+## 🚀 Installation Guide
 
 ### Prerequisites
+- Node.js >= 18
+- npm >= 9
+- MongoDB Atlas account (or local MongoDB)
+- Google Cloud Console project (for OAuth + Books API)
+- Gemini API key (for AI features)
+- Cloudinary account (optional — only needed if `USE_CLOUDINARY_PDF=true`)
 
-- **Node.js** 18+ and **npm**
-- **MongoDB** (local or [MongoDB Atlas](https://www.mongodb.com/cloud/atlas))
-- **Google OAuth** credentials ([Console](https://console.cloud.google.com/))
-- **Cloudinary** account (for PDF uploads)
-- **Google Books API Key** (optional, for better search)
+---
 
-### 1. Clone the repository
+### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/aryan-mod/BookT.git
-cd BookT
+git clone https://github.com/aryanKDev/nexusread.git
+cd nexusread
 ```
 
-### 2. Backend setup
+---
+
+### 2. Backend Setup
 
 ```bash
 cd backend
 npm install
-cp .env.example .env
 ```
 
-Edit `backend/.env`:
+Create your `.env` file (see Environment Variables section below):
 
-```env
-PORT=5000
-NODE_ENV=development
-MONGO_URI=mongodb+srv://user:pass@cluster.mongodb.net/bookt?retryWrites=true
-JWT_SECRET=your-super-secret-jwt-key-change-in-production
-FRONTEND_URL=http://localhost:5174
-CORS_ORIGIN=http://localhost:5173,http://localhost:5174
-
-# Google OAuth
-GOOGLE_CLIENT_ID=your_client_id.apps.googleusercontent.com
-GOOGLE_CLIENT_SECRET=your_secret
-
-# Cloudinary (for PDF upload)
-CLOUDINARY_CLOUD_NAME=your_cloud
-CLOUDINARY_API_KEY=your_key
-CLOUDINARY_API_SECRET=your_secret
-
-# Optional
-GOOGLE_BOOKS_API_KEY=your_key
+```bash
+cp .env.example .env
+# Edit .env with your actual values
 ```
 
 Start the backend:
 
 ```bash
+# Development (with hot-reload)
 npm run dev
+
+# Production
+npm start
 ```
 
-### 3. Frontend setup
+The API will be available at `http://localhost:5000/api/v1`
+
+> **Health check:** `GET /api/v1/health`
+
+---
+
+### 3. Frontend Setup
 
 ```bash
-cd ..   # back to root
+# From the project root
 npm install
 ```
 
-Create `.env` (optional; defaults to `http://localhost:5000/api/v1`):
+Create a `.env` file in the root:
 
-```env
+```bash
 VITE_API_URL=http://localhost:5000/api/v1
+VITE_GOOGLE_CLIENT_ID=your_google_client_id_here
 ```
 
 Start the frontend:
@@ -265,65 +332,219 @@ Start the frontend:
 npm run dev
 ```
 
-### 4. Open the app
+The app will be available at `http://localhost:5173`
 
-- Frontend: [http://localhost:5174](http://localhost:5174) (or the port Vite shows)
-- Backend: [http://localhost:5000](http://localhost:5000)
+---
+
+## 🔑 Environment Variables
+
+### Backend (`backend/.env`)
+
+```env
+# Server
+PORT=5000
+NODE_ENV=development
+
+# Database
+MONGO_URI=mongodb+srv://<username>:<password>@cluster.mongodb.net/<dbname>?retryWrites=true&w=majority
+
+# JWT — never commit real values
+JWT_SECRET=your-super-secret-jwt-key-min-32-chars
+JWT_ACCESS_EXPIRE=15m
+REFRESH_TOKEN_EXPIRE_DAYS=7
+REFRESH_TOKEN_COOKIE_NAME=refreshToken
+
+# CORS — must match your frontend origin exactly (for HttpOnly cookie credentials)
+FRONTEND_URL=http://localhost:5173
+CORS_ORIGIN=http://localhost:5173,http://localhost:5174
+
+# Rate Limiting (auth endpoints, per 15 min window)
+AUTH_RATE_LIMIT_MAX=10
+
+# Google OAuth
+GOOGLE_CLIENT_ID=your_google_client_id.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=your_google_client_secret
+
+# External APIs
+GOOGLE_BOOKS_API_KEY=your_google_books_api_key
+GEMINI_API_KEY=your_gemini_api_key
+
+# Cloudinary (PDF upload — optional)
+USE_CLOUDINARY_PDF=false
+CLOUDINARY_CLOUD_NAME=your_cloud_name
+CLOUDINARY_API_KEY=your_api_key
+CLOUDINARY_API_SECRET=your_api_secret
+```
+
+### Frontend (`.env` in project root)
+
+```env
+VITE_API_URL=http://localhost:5000/api/v1
+VITE_GOOGLE_CLIENT_ID=your_google_client_id.apps.googleusercontent.com
+```
 
 ---
 
 ## 📡 API Overview
 
-| Group | Endpoint | Methods | Description |
-|-------|----------|---------|-------------|
-| **Auth** | `/api/v1/auth` | POST | register, login, google, refresh, logout |
-| **Auth** | `/api/v1/auth/me` | GET | Current user (protected) |
-| **Books** | `/api/v1/books/search` | GET | Aggregated book search |
-| **Books** | `/api/v1/books` | GET, POST | Library list, add book |
-| **Books** | `/api/v1/books/:id` | GET, PUT, DELETE | Single book CRUD |
-| **Reader** | `/api/v1/reader/upload` | POST | PDF upload |
-| **Reader** | `/api/v1/reader/progress` | GET, PATCH | Reading progress |
-| **Reader** | `/api/v1/reader/dashboard/*` | GET | Stats, streak, activity, goals |
-| **Admin** | `/api/v1/admin/*` | GET, PATCH | Stats, users, audit, ban |
-| **Book Requests** | `/api/v1/book-requests` | POST, GET | Submit, list pending |
-| **Health** | `/api/v1/health` | GET | API status |
+### Auth Routes — `/api/v1/auth`
 
-Full API details in [PROJECT_DOCUMENTATION.md](./PROJECT_DOCUMENTATION.md#7-api-endpoints).
+| Method | Endpoint | Description | Auth |
+|--------|----------|-------------|------|
+| `POST` | `/register` | Register new user | Public |
+| `POST` | `/login` | Login with email/password | Public |
+| `POST` | `/google` | Google OAuth sign-in / sign-up | Public |
+| `POST` | `/refresh` | Rotate refresh token, get new access token | Cookie |
+| `POST` | `/logout` | Revoke all sessions, clear cookie | Public |
+| `GET` | `/me` | Get current authenticated user | Protected |
+
+### Book Routes — `/api/v1/books`
+
+| Method | Endpoint | Description | Auth |
+|--------|----------|-------------|------|
+| `GET` | `/` | Get all books (catalogue) | Optional |
+| `POST` | `/` | Add book to personal library | Protected |
+| `PUT` | `/:id` | Update book (progress, status, rating) | Protected |
+| `DELETE` | `/:id` | Remove book from library | Protected |
+| `GET` | `/search` | Search OpenLibrary / Google Books | Public |
+
+### Reader Routes — `/api/v1/reader`
+
+| Method | Endpoint | Description | Auth |
+|--------|----------|-------------|------|
+| `POST` | `/upload` | Upload PDF (Cloudinary or local) | Protected |
+| `GET` | `/:bookId` | Get uploaded book metadata | Protected |
+| `GET` | `/progress` | Get reading progress for a book | Protected |
+| `PATCH` | `/progress` | Update current page + percentage | Protected |
+| `POST` | `/session` | Log a reading session (duration) | Protected |
+
+### AI Routes — `/api/v1/ai`
+
+| Method | Endpoint | Body | Auth |
+|--------|----------|------|------|
+| `POST` | `/summarize` | `{ text, bookTitle? }` | Protected |
+| `POST` | `/explain` | `{ text }` | Protected |
+| `POST` | `/define` | `{ word, context? }` | Protected |
+| `POST` | `/ask` | `{ question, context? }` | Protected |
+| `POST` | `/smart-notes` | `{ highlights[] }` | Protected |
+
+### Admin Routes — `/api/v1/admin`
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/users` | List all users |
+| `PATCH` | `/users/:id/toggle-ban` | Ban / unban user |
+| `GET` | `/audit-logs` | Last 50 admin actions |
+| `GET` | `/stats` | Dashboard stats |
+| `GET` | `/book-requests` | Pending book requests |
+| `PATCH` | `/book-requests/:id/approve` | Approve a book request |
+| `PATCH` | `/book-requests/:id/reject` | Reject a book request |
+
+### Other Route Groups
+
+| Group | Prefix | Key Features |
+|-------|--------|--------------|
+| Gamification | `/api/v1/gamification` | Badges, leaderboard, coin awards |
+| Marketplace | `/api/v1/marketplace` | Book listings, pricing |
+| Orders | `/api/v1/orders` | Purchase flow |
+| Reviews | `/api/v1/reviews` | Star ratings + written reviews |
+| Social | `/api/v1/social` | Follows, activity feed |
+| Notifications | `/api/v1/notifications` | In-app alerts |
+| Book Requests | `/api/v1/book-requests` | User submission queue |
 
 ---
 
-## 🔒 Security
+## 🔒 Security Features
 
-- **JWT** access tokens (15 min) + refresh tokens in **HttpOnly** cookies (7 days)
-- **bcrypt** password hashing (factor 12)
-- **Helmet** security headers
-- **Rate limiting** on auth, search, admin
-- **NoSQL injection** protection (mongo-sanitize)
-- **XSS** protection (xss-clean)
-- **CORS** whitelist
-- **Input validation** (express-validator)
+### JWT + Refresh Token Architecture
+- **Access token** — short-lived (15m), signed with `JWT_SECRET`, sent in `Authorization: Bearer` header, stored **only in React `useRef`** (never persisted to disk)
+- **Refresh token** — long-lived (7 days), stored in **HttpOnly, Secure, SameSite=Strict** cookie — not accessible to JavaScript
+- **Rotation** — every `/auth/refresh` call issues a new refresh token and revokes the old one in MongoDB
+- **Theft detection** — if a used (already-rotated) token is presented again, all sessions for that user are immediately revoked
+
+### Brute Force & Abuse Prevention
+- Login endpoint: **5 attempts per 15 min** in production
+- Register endpoint: same limit as login
+- General auth routes: 100 requests per 15 min
+- API routes: 1,000 requests per 15 min
+- Search endpoints: 60 requests per minute
+- All limits relaxed in development (`NODE_ENV !== 'production'`)
+
+### Input Sanitization
+- **`express-mongo-sanitize`** — strips `$` and `.` from all request inputs to block NoSQL injection
+- **`xss-clean`** — sanitizes HTML tags from all `req.body`, `req.params`, `req.query`
+- **Body size limit** — `express.json({ limit: '10kb' })` prevents payload flooding
+
+### HTTP Security Headers (Helmet)
+- `X-Content-Type-Options: nosniff`
+- `X-Frame-Options: DENY`
+- `X-XSS-Protection`
+- `Strict-Transport-Security` (HSTS)
+- Content Security Policy
+- `crossOriginResourcePolicy: cross-origin` (for PDF inline serving)
+
+### CORS Configuration
+- Explicit **allow-list** of origins (no wildcard `*`)
+- `credentials: true` required for HttpOnly cookie flow
+- Unknown origins silently rejected (no CORS headers sent)
+
+### Access Control
+- `protect` middleware — verifies JWT signature + checks user still exists + checks `isBanned`
+- `restrictTo('admin')` middleware — role-based endpoint gating
+- `optionalProtect` — enriches response for logged-in users without blocking unauthenticated access
+- Per-resource ownership check — users can only access their own uploaded PDFs and reading progress
+
+### PDF Security
+- Uploaded PDFs served via `express.static` **behind `protect` middleware** — unauthenticated requests get 401
+- Files named with MongoDB ObjectId to prevent enumeration
+- Cloudinary raw upload as alternative (flag-based)
 
 ---
 
-## 📦 Deployment
+## 🖼️ Screenshots
 
-### Frontend (Vercel)
+> _Screenshots coming soon — visit the [live demo](https://nexusread.vercel.app/) to experience the app._
 
-1. Connect the repo to [Vercel](https://vercel.com)
-2. Set `VITE_API_URL` to your production API URL
-3. Deploy (Vercel handles the SPA rewrite)
-
-### Backend (Render / Railway / etc.)
-
-1. Create a Node.js service
-2. Set environment variables from `backend/.env.example`
-3. Point `FRONTEND_URL` and `CORS_ORIGIN` to your frontend URL
+| Page | Description |
+|------|-------------|
+| 🔐 Login / Register | Email + Google One Tap sign-in |
+| 📚 Dashboard | Personal library with status filters |
+| 📖 PDF Reader | Inline reader with AI sidebar |
+| 📊 Analytics | Reading heatmap, charts, streaks |
+| 🏆 Leaderboard | Top readers with badge display |
+| 🛒 Marketplace | Browse and purchase books |
+| 🛡️ Admin Panel | User management + book approval queue |
 
 ---
 
-## 📄 License
+## 🔮 Future Improvements
 
-ISC License. See [LICENSE](LICENSE) for details.
+### AI & Intelligence
+- [ ] Personalized book recommendations based on reading history and genre preferences
+- [ ] AI-generated reading plans and daily goals
+- [ ] Semantic book search using embeddings
+
+### Social & Community
+- [ ] Public reading clubs / group reading sessions
+- [ ] Friend activity feed and shared highlights
+- [ ] Book discussions and threaded comments
+
+### Mobile & Cross-Platform
+- [ ] React Native mobile app (iOS + Android)
+- [ ] PWA support with offline reading capability
+- [ ] Push notifications (Web Push API)
+
+### Performance & Scalability
+- [ ] **Redis caching** for leaderboard, book catalogue, and session data (config stub already present)
+- [ ] Lazy-load PDF pages for large documents
+- [ ] CDN-hosted assets and image optimization
+- [ ] Background job queue (BullMQ) for badge checking and notifications
+
+### Developer Experience
+- [ ] OpenAPI / Swagger documentation at `/api/v1/docs`
+- [ ] Automated test suite (Jest + Supertest for API, Vitest for frontend)
+- [ ] Docker Compose for local development
+- [ ] GitHub Actions CI/CD pipeline
 
 ---
 
@@ -331,16 +552,17 @@ ISC License. See [LICENSE](LICENSE) for details.
 
 **Aryan Kushwaha**
 
-- GitHub: https://github.com/aryan-mod
-- LinkedIn: https://linkedin.com/in/aryan-kushwaha-007330302/
-- Email: kushwahaaryan1658@gmail.com
+[![GitHub](https://img.shields.io/badge/GitHub-aryanKDev-181717?style=flat-square&logo=github)](https://github.com/aryanKDev)
+
+---
+
+## 📄 License
+
+This project is licensed under the **ISC License**.
 
 ---
 
 <div align="center">
-
-**Built with ❤️ using React, Node.js, and MongoDB**
-
-⭐ Star this repo if you find it useful!
-
+  <strong>Built with ❤️ by Aryan Kushwaha</strong><br/>
+  <a href="https://nexusread.vercel.app/">nexusread.vercel.app</a>
 </div>
